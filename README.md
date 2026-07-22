@@ -63,10 +63,10 @@ what the original games do) — and differ in what happens around the button:
   dash-jump keeps that speed for the whole arc. Same height, 2.3× the
   distance.
 - **Kirby Super Star (Kirby)** — the fourth answer to variable height: why
-  land at all? An asymmetric jump (burst up under high gravity, drift down
-  under low), then press jump mid-air to puff up — every press flaps
-  upward, and while puffed Kirby parachutes down at a fraction of normal
-  fall speed, indefinitely. Flight as forgiveness.
+  land at all? A very reactive fixed-height hop (high force, high gravity
+  both ways — up fast, right back down), then press jump mid-air to puff
+  up — every press flaps upward, and while puffed Kirby parachutes down at
+  a fraction of normal fall speed, indefinitely. Flight as forgiveness.
 - **Ori and the Blind Forest (Ori)** — the fifth answer: rhythm. The
   triple jump is a *ground* chain — land and jump again within a beat and
   the sequence escalates skip → hop → spinning flip, with jump heights
@@ -134,18 +134,19 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   walk 1.5, dash 3.5, jump 5.0, gravity 0.25, terminal 5.75 px/f.
   *Approximated:* the dash is modeled as hold-to-dash rather than the real
   timed burst, and wall slides/kicks are not implemented.
-- **Kirby Super Star**: no public disassembly documents its constants, so
-  everything here is feel-fitted. Ground movement is Super Star style —
-  instant walk (1.25 px/f) with a double-speed dash (2.5) on the run
-  button. The vertical model follows Celia Wagar's Kirby Super Star jump
-  diagram:
-  high initial force with high gravity while ascending (an upward burst),
-  a much lower gravity once Y velocity reaches 0, and float jumps with a
-  low initial force under a low capped terminal velocity. The first jump's
-  height is fixed — Super Star's ground jump does not scale with hold
-  duration. *Approximated (feel-fitted):* the specific constants (9.0
-  force, 0.28125 rise / 0.09375 fall gravity, 2.5 fall cap, 2.0 flap,
-  0.75 float cap) — exact values aren't publicly documented.
+- **Kirby Super Star**: no public disassembly documents its constants (the
+  [KSS disassembly](https://github.com/Ankouno/KSS-disassembly) covers
+  system banks only), so everything here is feel-fitted. Ground movement
+  is Super Star style — instant walk (1.25 px/f) with a double-speed dash
+  (2.5) on the run button. The vertical model follows Celia Wagar's
+  direction: the first jump is *very* reactive — a really high initial
+  force under really high gravity in both directions (0.45 rising, 0.4
+  falling), so Kirby bursts up and comes right back down at a fixed
+  height (Super Star's ground jump does not scale with hold duration).
+  The floatiness all lives in the float: flap jumps use a low impulse
+  (2.0) under low gravity with a 0.75 fall cap, forever. *Approximated
+  (feel-fitted):* the specific constants (9.0 force, 0.45/0.4 gravity,
+  4.0 fall cap) — exact values aren't publicly documented.
 - **Ori**: the ground-chain heights are sourced — FirstJumpHeight 3,
   SecondJumpHeight 3.75, ThirdJumpHeight 4.5 (a 1 : 1.25 : 1.5 ladder,
   read from the SeinJump controller in a fan-provided Will of the Wisps
@@ -155,11 +156,13 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   Deceleration 30 units/s, applied identically on the ground and in the
   air — converted via the 3-unit first-jump anchor (21.5 px/unit at
   60 fps) to 4.157 / 0.358 / 0.179 px-frame values. Frames render at 1:1
-  native pixels. *Approximated:* the chain window (12 frames), the
+  native pixels; the run is the full 13-frame hand-drawn cycle (smear
+  frames included) advancing every screen frame, 60 fps. *Approximated:*
+  the chain window (12 frames), the
   gravity pair, and the Double Jump force. Ori's frames are the game's actual
   hand-drawn animation art, extracted from the `seinPlatformingAtlas`
-  textures of a personally owned copy (the game is fully sprite-based) and
-  downscaled to the sample's scale; a pixel-art placeholder remains as the
+  textures of a personally owned copy (the game is fully sprite-based);
+  a pixel-art placeholder remains as the
   fallback. Ori is © Microsoft / Moon Studios.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame

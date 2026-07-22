@@ -293,17 +293,17 @@ yVelocity -= 0.25`,
     defaults: {
       walkSpeed: 1.25,       // Super Star movement, approximated
       runSpeed: 2.5,         // dash: roughly double walk speed
-      jumpForce: 9.0,        // high force + high rising gravity = upward burst
-      riseGravity: 0.28125,  // higher gravity while ascending
-      fallGravity: 0.09375,  // once Y velocity hits 0, lower gravity is used
-      terminal: 2.5,         // Kirby never falls fast
+      jumpForce: 9.0,        // high force + high gravity = a snappy burst
+      riseGravity: 0.45,     // high gravity while ascending...
+      fallGravity: 0.4,      // ...AND on the way down — very reactive
+      terminal: 4.0,         // real falls are quick; the float is the floaty part
       flapImpulse: 2.0,      // float jumps: low initial force...
       floatGravity: 0.09375,
       floatTerminal: 0.75,   // ...and a low capped terminal velocity
       floatSpeed: 0.875,
     },
     sliders: [
-      { key: 'jumpForce',     label: 'Initial jump force', min: 2, max: 8, step: 0.0625 },
+      { key: 'jumpForce',     label: 'Initial jump force', min: 2, max: 12, step: 0.0625 },
       { key: 'riseGravity',   label: 'Gravity (rising)',   min: 0.05, max: 0.6, step: 0.005 },
       { key: 'fallGravity',   label: 'Gravity (falling)',  min: 0.03, max: 0.6, step: 0.005 },
       { key: 'flapImpulse',   label: 'Flap impulse',       min: 0.5, max: 4, step: 0.125 },
@@ -311,13 +311,12 @@ yVelocity -= 0.25`,
     ],
     explainer: `
       <h2>The Kirby Jump</h2>
-      <p>Asymmetric gravity, per Celia Wagar's Kirby diagram: a really high
-      initial force <i>and</i> really high gravity while ascending, so Kirby
-      bursts upward — then once Y velocity hits 0, a much lower falling
-      gravity (with a slow fall cap) takes over. The first jump's height is
-      <i>fixed</i> — holding the button does nothing. Press jump mid-air to
-      puff up: float jumps use a low initial force and a low capped
-      terminal velocity. Forever.</p>
+      <p>The first jump is <i>very</i> reactive: a really high initial
+      force under really high gravity — in <b>both</b> directions, so Kirby
+      bursts up and comes right back down. Its height is <i>fixed</i> —
+      holding the button does nothing. All of Kirby's famous floatiness
+      lives in the float: press jump mid-air to puff up, and flaps use a
+      low impulse with a low capped fall speed. Forever.</p>
       <p class="rule"><b>The twist: flight as forgiveness.</b> Missed the
       ledge? Flap. Ground movement is Super Star style: an instant walk and
       a double-speed dash on <kbd>Shift</kbd>.</p>`,
@@ -326,8 +325,8 @@ yVelocity -= 0.25`,
       puffed = true, yVelocity = flap</span>
 y += yVelocity
 if (puffed)      yVelocity -= 0.094 <span class="hl">// max fall 0.75</span>
-else if (rising) yVelocity -= 0.281 <span class="hl">// burst up</span>
-else             yVelocity -= 0.094 <span class="hl">// drift down</span>`,
+else if (rising) yVelocity -= 0.45 <span class="hl">// burst up</span>
+else             yVelocity -= 0.40 <span class="hl">// and right back down</span>`,
   },
 
   ori: {
@@ -448,8 +447,9 @@ const SPRITE_DEFS = {
   /* Ori's frames ship at the game's native resolution and draw at 1:1
      screen pixels (scale = 1/SCALE), so no resampling ever happens. */
   ori: { facesLeft: false, scale: 1 / SCALE, frames: {
-    idle: 'ori_idle', run1: 'ori_run1', run2: 'ori_run2',
-    run3: 'ori_run3', run4: 'ori_run4',
+    idle: 'ori_idle',
+    ...Object.fromEntries(Array.from({ length: 13 },
+      (_, i) => ['run' + (i + 1), 'ori_run' + (i + 1)])),
     skip: 'ori_skip', hop: 'ori_hop', flip: 'ori_flip',
     fall: 'ori_fall' } },
   sonic: { facesLeft: false, frames: {
@@ -463,7 +463,7 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 6;         // bump when sprite files change, so caches can't
+const ASSET_V = 7;         // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -1341,8 +1341,8 @@ function spriteFrameKey() {
       const d = Math.max(3, Math.round(8 - speed * 2));
       return 'walk' + ((Math.floor(animClock / d) % 3) + 1);
     }
-    if (charKey === 'ori')
-      return 'run' + ((Math.floor(animClock / 4) % 4) + 1);
+    if (charKey === 'ori')            /* full 13-frame cycle, 60 fps */
+      return 'run' + ((animClock % 13) + 1);
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05) return 'dash';
       return 'run' + ((Math.floor(animClock / 4) % 10) + 1);
