@@ -67,6 +67,10 @@ what the original games do) — and differ in what happens around the button:
   under low), then press jump mid-air to puff up — every press flaps
   upward, and while puffed Kirby parachutes down at a fraction of normal
   fall speed, indefinitely. Flight as forgiveness.
+- **Ori and the Blind Forest (Ori)** — the fifth answer: jump again. Up to
+  two air jumps (the Double and Triple Jump abilities) each fire a fresh
+  impulse mid-arc, resetting on landing; every jump is soft-gravity while
+  held. One dashed line, three humps.
 
 ## Game-feel assists
 
@@ -140,6 +144,13 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   (feel-fitted):* the specific constants (5.0 force, 0.28125 rise /
   0.09375 fall gravity, 2.5 fall cap, 2.0 flap, 0.75 float cap) — exact
   values aren't publicly documented.
+- **Ori and the Blind Forest**: entirely feel-fitted — the game is a
+  modern Unity title with no public frame-data tables. The model captures
+  the Triple Jump ability structure (a ground jump plus up to two air
+  jumps, count reset on landing) with a hold/release gravity switch; the
+  specific constants are approximations. Ori's figure is original pixel
+  art drawn for this sample — the game animates a skeletal rig, so no
+  sprite frames exist to rip. Ori is © Microsoft / Moon Studios.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table

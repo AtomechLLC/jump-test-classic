@@ -329,9 +329,49 @@ if (puffed)      yVelocity -= 0.094 <span class="hl">// max fall 0.75</span>
 else if (rising) yVelocity -= 0.281 <span class="hl">// burst up</span>
 else             yVelocity -= 0.094 <span class="hl">// drift down</span>`,
   },
+
+  ori: {
+    name: 'Ori', game: 'Ori and the Blind Forest', accent: '#4aa8d8',
+    hitboxW: 12,
+    defaults: {
+      topSpeed: 2.8,          // all values feel-fitted — see README
+      accel: 0.3,
+      friction: 0.35,
+      jumpForce: 4.6,
+      airJumpForce: 4.0,
+      holdGravity: 0.17,
+      releaseGravity: 0.4,
+      terminal: 5,
+      airJumps: 2,            // Double Jump + the Triple Jump upgrade
+    },
+    sliders: [
+      { key: 'jumpForce',      label: 'Initial jump force',    min: 2, max: 8, step: 0.1 },
+      { key: 'airJumpForce',   label: 'Air jump force',        min: 1, max: 8, step: 0.1 },
+      { key: 'airJumps',       label: 'Air jumps',             min: 0, max: 4, step: 1 },
+      { key: 'holdGravity',    label: 'Gravity (button held)', min: 0.03, max: 0.6, step: 0.005 },
+      { key: 'releaseGravity', label: 'Gravity (released)',    min: 0.03, max: 1.0, step: 0.005 },
+    ],
+    explainer: `
+      <h2>The Ori Jump</h2>
+      <p>The fifth answer to variable height: <i>jump again.</i> Blind
+      Forest's ability tree literally sells it — Double Jump, then the
+      Triple Jump upgrade. Press jump in mid-air (up to twice) and a fresh
+      impulse fires from wherever you are; the count resets on landing.
+      Each jump is soft-gravity while held, heavy when released.</p>
+      <p class="rule"><b>The twist: the arc is a sequence.</b> One dashed
+      line, three humps — height, distance, and course-correction all come
+      from <i>when</i> you spend the next jump. Try the air-jumps slider.</p>`,
+    pseudocode:
+`<span class="hl">if (airborne && jumpPressed && used &lt; 3)
+      yVelocity = airJumpForce, used++</span>
+y += yVelocity
+if (rising && jumpHeld)
+      yVelocity -= 0.17
+else  yVelocity -= 0.40`,
+  },
 };
 
-const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx', 'kirby'];
+const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx', 'kirby', 'ori'];
 
 /* ---- modern game-feel assists (toggleable, applied to every character) ---- */
 const COYOTE_FRAMES = 6;   // grace window after walking off a ledge
@@ -395,6 +435,9 @@ const SPRITE_DEFS = {
     tumble3: 'kirby_tumble3',
     puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
     puff4: 'kirby_puff4' } },
+  ori: { facesLeft: false, inline: true, frames: {
+    idle: 'idle', run1: 'run1', run2: 'run2',
+    jump: 'jump', fall: 'fall', flip: 'flip' } },
   sonic: { facesLeft: false, frames: {
     idle: 'sonic_idle',
     walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
@@ -483,13 +526,49 @@ FALLBACK_PALETTES.megamanx = { r: '#00a0a8', h: '#005060', s: '#f8d8b0', b: '#70
 FALLBACK_MAPS.kirby = FALLBACK_MAPS.sonic;           // round silhouette
 FALLBACK_PALETTES.kirby = { b: '#e888b8', s: '#f8c8d8', r: '#d04870', w: '#ffffff', k: '#101010' };
 
+/* Ori is original pixel art (the game is skeletal-animated — no sprite
+   frames exist to rip), so these maps ARE the sprites, built inline. */
+FALLBACK_PALETTES.ori = { w: '#f0f6ff', s: '#b8cbe4', o: '#71809f', e: '#2c3a55', g: '#a8e4f0' };
+FALLBACK_MAPS.ori = {
+  idle: [
+    '.....o..o.......', '....owo owo.....', '....owwowwo.....', '.....owwwwoo....',
+    '.....owwwwwo....', '....owwewwwo....', '....owwwwwo.....', '.....owwwo......',
+    '.....sowws......', '....owwwwwo.....', '...oswwwwwso....', '..os.owwwws.....',
+    '.oo...owwo......', '.......oo.......', '......ow.wo.....', '......o...o.....',
+    '.....oo...oo....'],
+  run1: [
+    '....o..o........', '...owo owo......', '...owwowwo......', '....owwwwoo.....',
+    '....owwwwwwo....', '...owwewwwwo....', '....owwwwwo.....', '.....owwwo......',
+    '....sowwws......', '...owwwwwwo.....', '..oswwwwwso.....', '.os.owwwws......',
+    'oo...owwo.......', '....ow..wo......', '...ow....wo.....', '..oo......oo....'],
+  run2: [
+    '....o..o........', '...owo owo......', '...owwowwo......', '....owwwwoo.....',
+    '....owwwwwwo....', '...owwewwwwo....', '....owwwwwo.....', '.....owwwo......',
+    '....sowwws......', '...owwwwwwo.....', '..oswwwwwso.....', '.os.owwwws......',
+    'oo...owwo.......', '......ow........', '.....owwo.......', '.....o..o.......'],
+  jump: [
+    '......o..o......', '.....owo owo....', '.....owwowwo....', '......owwwwoo...',
+    '......owwwwwo...', '.....owwewwwo...', '.....owwwwwo....', '......owwwo.....',
+    '.....sowwws.....', '....owwwwwo.....', '...oswwwwso.....', '....owwwso......',
+    '...ow.owo.......', '..ow...o........'],
+  fall: [
+    '.....o....o.....', '.....ow..wo.....', '.....owoowo.....', '......owwwo.....',
+    '.....owwwwoo....', '....owwewwwo....', '.....owwwwo.....', '.....owwwo......',
+    '....sowwws......', '...owwwwwwo.....', '..o.swwwws.o....', '.o...owwo...o...',
+    '.....ow.wo......', '....ow...wo.....', '...oo.....oo....'],
+  flip: [
+    '.....oooo.......', '...oowwwwoo.....', '..owwwsswwwo....', '..owsoowwswo....',
+    '.owso.ewwswo....', '.owwo.owwswo....', '..owwwwwswo.....', '..oswwwsswo.....',
+    '...oosssoo......', '.....oooo.......'],
+};
+
 /* frameKey → fallback pixel map, per character */
 function fallbackMapFor(charKey, frameKey) {
   const maps = FALLBACK_MAPS[charKey];
   if (maps[frameKey]) return maps[frameKey];
   const n = +frameKey.replace(/\D/g, '') || 1;
   if (/^(ball|puff|tumble)/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
-  if (/jump|fall|spin/.test(frameKey)) return maps.jump || maps.idle;
+  if (/jump|fall|spin|flip/.test(frameKey)) return maps.jump || maps.idle;
   if (/^(walk|frun|run)/.test(frameKey)) return n % 2 ? maps.run1 : maps.run2;
   return maps.idle;
 }
@@ -514,6 +593,11 @@ function loadSprites() {
   const jobs = [];
   for (const [charKey, def] of Object.entries(SPRITE_DEFS)) {
     SPRITE_CACHE[charKey] = {};
+    if (def.inline) {                       /* built from pixel maps, no fetch */
+      for (const frameKey of Object.keys(def.frames))
+        SPRITE_CACHE[charKey][frameKey] = buildFallbackSprite(charKey, frameKey);
+      continue;
+    }
     for (const [frameKey, file] of Object.entries(def.frames)) {
       jobs.push(new Promise(resolve => {
         const img = new Image();
@@ -550,7 +634,7 @@ function newPlayerState(x) {
            jumping: false, holdG: 0.125, fallG: 0.4375, pMeter: 0, dash: 0,
            sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
            floating: false, freeze: 0, tumble: 0, flapAnim: 0,
-           takeoffX: x, takeoffY: GROUND };
+           jumpsUsed: 0, airFlip: 0, takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -592,8 +676,16 @@ function stepPhysics(st, charKey, P, input) {
     } else {
       st.vy = -P.jumpForce;
       if (charKey === 'metroid') st.spinJump = Math.abs(st.vx) > 0.2;
+      if (charKey === 'ori') { st.jumpsUsed = 1; st.holdG = P.holdGravity; st.fallG = P.releaseGravity; }
     }
     st.grounded = false; st.jumping = true; ev.jumped = true;
+  } else if (charKey === 'ori' && input.jumpPressed && !st.grounded &&
+             st.jumpsUsed < 1 + P.airJumps) {
+    st.vy = -P.airJumpForce;             /* air jump — the triple-jump chain */
+    st.jumpsUsed++;
+    st.jumping = true;
+    st.airFlip = 14;
+    st.holdG = P.holdGravity; st.fallG = P.releaseGravity;
   } else if (charKey === 'kirby' && input.jumpPressed && !st.grounded) {
     st.floating = true;                  /* puff up — every press is a flap */
     st.vy = -P.flapImpulse;
@@ -698,6 +790,15 @@ function stepPhysics(st, charKey, P, input) {
     } else if (st.grounded && st.vx !== 0) {
       st.vx = Math.abs(st.vx) <= P.accel ? 0 : st.vx - Math.sign(st.vx) * P.accel;
     }
+  } else if (charKey === 'ori') {
+    if (input.dir !== 0) {
+      const turning = st.vx !== 0 && Math.sign(st.vx) !== input.dir;
+      st.vx += input.dir * P.accel * (turning ? 2 : 1);
+      if (Math.abs(st.vx) > P.topSpeed) st.vx = Math.sign(st.vx) * P.topSpeed;
+    } else if (st.grounded && st.vx !== 0) {
+      const f = P.friction;
+      st.vx = Math.abs(st.vx) <= f ? 0 : st.vx - Math.sign(st.vx) * f;
+    }
   } else if (charKey === 'kirby') {
     const cap = (!st.grounded && st.floating) ? P.floatSpeed
               : (input.run ? P.runSpeed : P.walkSpeed);
@@ -783,6 +884,7 @@ function stepPhysics(st, charKey, P, input) {
     if (onGround) {
       if (!st.grounded) ev.landed = true;
       st.grounded = true; st.vy = 0; st.jumping = false; st.floating = false;
+      st.jumpsUsed = 0;
     } else if (st.grounded) {
       st.grounded = false;               /* walked off a ledge */
       st.coyoteTimer = COYOTE_FRAMES;
@@ -791,9 +893,10 @@ function stepPhysics(st, charKey, P, input) {
 
   /* gravity — applied AFTER the position update, like the diagram says */
   if (!st.grounded && !skipMove) {
-    if (charKey === 'mario' || charKey === 'smw') {
+    if (charKey === 'mario' || charKey === 'smw' || charKey === 'ori') {
       st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
       if (st.vy > P.terminal) st.vy = P.terminal;
+      if (st.airFlip > 0) st.airFlip--;
     } else if (charKey === 'kirby') {
       if (st.floating) {
         st.vy += P.floatGravity;         /* puffed: parachute drift */
@@ -859,7 +962,8 @@ let jumpQueued = false;
 /* ---- auto demo: run, full-hold jump, admire the stats, next character ---- */
 
 const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170,
-                      metroid: 165, megaman: 180, megamanx: 165, kirby: 170 };
+                      metroid: 165, megaman: 180, megamanx: 165, kirby: 170,
+                      ori: 130 };
 const demo = { phase: 'off', timer: 0, pinned: false, flutterDone: false };
 
 function startDemo() {
@@ -897,7 +1001,10 @@ function demoInput() {
       demo.timer++;
       const flap = charKey === 'kirby' && demo.flutterDone &&
                    demo.timer > 10 && demo.timer < 150 && player.vy > 0.4;
-      return { ...move, jumpHeld: true, jumpPressed: flap };
+      /* Ori's showcase: spend the double and triple jump as the fall begins */
+      const airJump = charKey === 'ori' && demo.timer > 8 && player.vy > 0.8 &&
+                      player.jumpsUsed < 3;
+      return { ...move, jumpHeld: true, jumpPressed: flap || airJump };
     }
     case 'admire':
       if (--demo.timer <= 0) {
@@ -1024,6 +1131,7 @@ addEventListener('keydown', e => {
   if (e.key === '6') selectChar('megaman');
   if (e.key === '7') selectChar('megamanx');
   if (e.key === '8') selectChar('kirby');
+  if (e.key === '9') selectChar('ori');
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -1164,6 +1272,10 @@ function spriteFrameKey() {
     }
     if (charKey === 'megaman') return 'jump';       // one air pose, rise & fall
     if (charKey === 'megamanx') return player.vy < 0 ? 'jump' : 'fall';
+    if (charKey === 'ori') {
+      if (player.airFlip > 0) return 'flip';        // somersault on air jumps
+      return player.vy < 0 ? 'jump' : 'fall';
+    }
     if (charKey === 'kirby') {
       if (player.floating) {
         if (player.flapAnim > 0)         /* one flap cycle per press */
@@ -1188,6 +1300,8 @@ function spriteFrameKey() {
       const d = Math.max(3, Math.round(8 - speed * 2));
       return 'walk' + ((Math.floor(animClock / d) % 3) + 1);
     }
+    if (charKey === 'ori')
+      return 'run' + ((Math.floor(animClock / 5) % 2) + 1);
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05) return 'dash';
       return 'run' + ((Math.floor(animClock / 4) % 10) + 1);
