@@ -1,0 +1,4 @@
+# Ripped sprite frames — copyrighted game assets, not redistributed.
+# See "Sprite credits" in README.md for how to fetch and slice them locally;
+# without them the app uses built-in placeholder pixel art.
+assets/

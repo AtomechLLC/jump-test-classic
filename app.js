@@ -1,0 +1,871 @@
+/* The Basics of Jumping — interactive edition
+   Inspired by Celia Wagar's animated diagram (critpoints.net).
+
+   Physics run at a fixed 60 Hz in world pixels (1 tile = 16 px), drawn at 3×.
+   Values are taken from disassembly-based documentation where available:
+   - SMB1: smbpedia (simplistic6502.github.io/smb1_tll) — accel/decel bytes and
+     the 5-entry speed-indexed jump table; velocities are px/frame (16 subpx/px,
+     forces in 1/4096 px).
+   - Sonic 1: Sonic Physics Guide (info.sonicretro.org/SPG) — exact constants,
+     update order (velocity added to position BEFORE gravity), air drag, and
+     the "no movement on the jump frame" quirk. Sonic 1 has no fall speed cap.
+   - Castlevania: TASVideos frame data (walk = 1 px/frame; flat jump = 40
+     frames; lands 2 blocks up at 29f / 1 up at 36f). The original uses a
+     preset trajectory table; v0=4.0 g=0.2 reproduces the documented rise
+     timings and 40-frame airtime to within a frame. */
+
+'use strict';
+
+const SCALE = 3;
+const VIEW_W = 1152, VIEW_H = 576;
+const W = VIEW_W / SCALE, H = VIEW_H / SCALE;   // 384 × 192 world px
+const TILE = 16;
+const GROUND = 168;                              // world y of the ground top
+const STEP_MS = 1000 / 60;
+
+const S = v => v * SCALE;
+
+/* ------------------------------------------------------------------ blocks */
+
+const BLOCKS = [
+  { x: 262, w: 36, h: 32 },   // 2 tiles
+  { x: 302, w: 36, h: 48 },   // 3 tiles
+  { x: 342, w: 42, h: 64 },   // 4 tiles
+].map(b => ({ ...b, y: GROUND - b.h }));
+
+/* -------------------------------------------------------------- characters */
+
+const CHARS = {
+  castlevania: {
+    name: 'Simon', game: 'Castlevania', accent: '#b5432a',
+    hitboxW: 12,
+    defaults: { walkSpeed: 1.0, jumpForce: 4.0, gravity: 0.2, terminal: 8 },
+    sliders: [
+      { key: 'jumpForce', label: 'Initial jump force', min: 2, max: 8, step: 0.1 },
+      { key: 'gravity',   label: 'Gravity per frame',  min: 0.05, max: 0.6, step: 0.005 },
+      { key: 'walkSpeed', label: 'Walk speed',         min: 0.4, max: 2.4, step: 0.1 },
+    ],
+    explainer: `
+      <h2>The Castlevania Jump</h2>
+      <p>The Castlevania jump (or Donkey Kong jump) is the most basic type of
+      jump that all other jumps are based on. It creates a parabolic arc with
+      only an initial jump force, and gravity.</p>
+      <p class="rule"><b>The twist: there is none.</b> The arc is fully
+      committed — no steering in the air, no cutting it short. Simon walks at
+      exactly 1 px/frame and a flat-ground jump lasts 40 frames; he can land
+      on a ledge 2 blocks up, never 3.</p>`,
+    pseudocode:
+`y         += yVelocity
+yVelocity -= gravity
+<span class="hl">// xVelocity is locked at takeoff
+// — no air control at all</span>`,
+  },
+
+  mario: {
+    name: 'Mario', game: 'Super Mario Bros.', accent: '#d03028',
+    hitboxW: 12,
+    defaults: {
+      minWalk: 0.07421875,       // 0x00130 — standstill snaps to this
+      walkAccel: 0.037109375,    // 0x00098
+      runAccel: 0.0556640625,    // 0x000E4 (B held)
+      releaseDecel: 0.05078125,  // 0x000D0
+      skidDecel: 0.1015625,      // 0x001A0
+      maxWalk: 1.5,              // 24 subpx/frame
+      maxRun: 2.5,               // 40 subpx/frame
+      terminal: 4.5,
+      jumpForce: 4.0,            // tier-1 values; other tiers scale from these
+      holdGravity: 0.125,        // 0x20/256
+      releaseGravity: 0.4375,    // 0x70/256
+    },
+    /* the speed-indexed jump table from the disassembly (px/frame):
+       |vx| >= min  →  initial vy, gravity holding A, gravity otherwise */
+    tiers: [
+      { min: 1.5625, vy: 5.0, hold: 0.15625,   fall: 0.5625 },  // ≥25 subpx
+      { min: 1.0,    vy: 4.0, hold: 0.1171875, fall: 0.375  },  // 16–24
+      { min: 0,      vy: 4.0, hold: 0.125,     fall: 0.4375 },  // <16
+    ],
+    sliders: [
+      { key: 'jumpForce',      label: 'Initial jump force',    min: 2, max: 8, step: 0.1 },
+      { key: 'holdGravity',    label: 'Gravity (button held)', min: 0.03, max: 0.6, step: 0.005 },
+      { key: 'releaseGravity', label: 'Gravity (released)',    min: 0.03, max: 1.0, step: 0.005 },
+      { key: 'maxRun',         label: 'Top speed (run)',       min: 1, max: 5, step: 0.1 },
+      { key: 'runAccel',       label: 'Acceleration (run)',    min: 0.02, max: 0.3, step: 0.005 },
+    ],
+    explainer: `
+      <h2>The Mario Jump</h2>
+      <p>Super Mario Bros. starts from the same recipe, then makes height
+      variable by <i>switching gravity</i>: while the button is held and Mario
+      is rising, gravity is weak (0.125). Release the button — or pass the
+      peak — and it becomes 0.4375, ~3.5× stronger.</p>
+      <p class="rule"><b>The twist: hold to go higher.</b> The jump table is
+      speed-indexed: at ≥1.5625 px/f the initial force becomes 5.0 (with
+      heavier gravity to match). Hold <kbd>Shift</kbd> to run, and try tapping
+      vs. holding the jump key.</p>`,
+    pseudocode:
+`y         += yVelocity
+<span class="hl">if (rising && jumpHeld)
+      yVelocity -= holdGravity    // weak
+else  yVelocity -= releaseGravity // ~3.5×</span>`,
+  },
+
+  sonic: {
+    name: 'Sonic', game: 'Sonic the Hedgehog', accent: '#2456e0',
+    hitboxW: 14,
+    defaults: { accel: 0.046875, decel: 0.5, friction: 0.046875, topSpeed: 6,
+                jumpForce: 6.5, gravity: 0.21875, releaseCap: 4 },
+    sliders: [
+      { key: 'jumpForce',  label: 'Initial jump force',     min: 2, max: 9, step: 0.1 },
+      { key: 'gravity',    label: 'Gravity per frame',      min: 0.05, max: 0.6, step: 0.005 },
+      { key: 'releaseCap', label: 'Release cap (jump cut)', min: 0.5, max: 6.5, step: 0.1 },
+      { key: 'topSpeed',   label: 'Top speed',              min: 2, max: 8, step: 0.1 },
+      { key: 'accel',      label: 'Acceleration',           min: 0.02, max: 0.25, step: 0.005 },
+    ],
+    explainer: `
+      <h2>The Sonic Jump</h2>
+      <p>Sonic keeps one gravity value (0.21875) but <i>cuts the jump on
+      release</i>: let go of the button while moving upward faster than
+      4 px/frame and your upward speed instantly drops to 4. There is no fall
+      speed cap in Sonic&nbsp;1.</p>
+      <p class="rule"><b>The twist: momentum.</b> Acceleration is 0.046875
+      px/f² (doubled in the air) against a top speed of 6, so the same 6.5
+      jump force produces wildly different arcs. Take a long run-up, then
+      jump.</p>`,
+    pseudocode:
+`<span class="hl">if (!jumpHeld && yVelocity > cap)
+      yVelocity = cap   // jump cut</span>
+y         += yVelocity
+yVelocity -= gravity
+<span class="hl">// then air drag while -4 &lt; yVel &lt; 0</span>`,
+  },
+};
+
+const CHAR_ORDER = ['castlevania', 'mario', 'sonic'];
+
+/* ----------------------------------------------------------------- sprites
+   Frames sliced from sheets on The Spriters Resource (see README credits).
+   Simon's sheet faces left; Mario's and Sonic's face right. */
+
+const SPRITE_DEFS = {
+  castlevania: { facesLeft: true, frames: {
+    idle: 'simon_idle', run1: 'simon_run1', run2: 'simon_run2',
+    run3: 'simon_run3', jump: 'simon_jump' } },
+  mario: { facesLeft: false, frames: {
+    idle: 'mario_idle', run1: 'mario_run1', run2: 'mario_run2',
+    run3: 'mario_run3', jump: 'mario_jump' } },
+  sonic: { facesLeft: false, frames: {
+    idle: 'sonic_idle',
+    walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
+    walk4: 'sonic_walk4', walk5: 'sonic_walk5', walk6: 'sonic_walk6',
+    frun1: 'sonic_run1', frun2: 'sonic_run2', frun3: 'sonic_run3',
+    frun4: 'sonic_run4',
+    ball1: 'sonic_ball1', ball2: 'sonic_ball2', ball3: 'sonic_ball3',
+    ball4: 'sonic_ball4' } },
+};
+
+const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
+
+/* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
+   sprites are not redistributed with this repo — see README). */
+
+const FALLBACK_PALETTES = {
+  castlevania: { d: '#4a2c14', a: '#c9782f', s: '#eec39a' },
+  mario: { r: '#e03c28', h: '#7a3410', s: '#f8c088', b: '#2a52c8', y: '#f8d820' },
+  sonic: { b: '#2456e0', s: '#f2c896', r: '#d82818', w: '#ffffff', k: '#101010' },
+};
+
+const SIMON_TOP = [
+  '.....dddddd.....', '....dddddddd....', '....ddssssdd....', '....dssssss.....',
+  '....dsssssss....', '....dssssss.....', '.....ssssss.....', '....aaaaaaa.....',
+  '...aaaaaaaaa....', '..aaaaaaaaaaa...', '..aa.aaaaa.aa...', '..ss.aaaaa.ss...',
+  '.....aaaaa......', '....aaaaaaa.....'];
+const MARIO_TOP = [
+  '....rrrrrr......', '...rrrrrrrrrr...', '...hhhhssss.....', '..hhshsssss.....',
+  '..hhshhssssss...', '..hhsssssss.....', '....ssssssss....', '...rrrbbrr......',
+  '..rrrrbbrrrr....', '.rrrrbbbbrrrr...', '.ssrrbybbybrss..', '.sssbbbbbbbss...',
+  '.ssbbbbbbbbbss..'];
+const SONIC_TOP = [
+  '......bbbb......', '....bbbbbbbb....', '...bbbbbbbbbb...', '.b.bbbbbbbbbb...',
+  '..bbbbbbbwwk....', '.bbbbbbbbwwk....', 'b.bbbbbbssss....', '.bbbbbbbsssk....',
+  '..bbbbbbsss.....', '...bbbbbbb......', '...bssssbb......', '..bbssssbbb.....',
+  '..s.bbbb.s......', '.ss..bb..ss.....'];
+
+const FALLBACK_MAPS = {
+  castlevania: {
+    idle: [...SIMON_TOP, '....aa.aaa......', '....aa..aa......', '....aa..aa......',
+      '....dd..dd......', '...ddd..ddd.....', '...ddd..ddd.....'],
+    run1: [...SIMON_TOP, '....aa.aaa......', '...aa....aa.....', '...aa....aa.....',
+      '...dd.....dd....', '..ddd.....ddd...', '..ddd.....ddd...'],
+    run2: [...SIMON_TOP, '....aaaa........', '....aa.aa.......', '....aa.aa.......',
+      '....dd.dd.......', '...ddd.ddd......', '...ddd.ddd......'],
+    jump: ['.....dddddd.....', '....dddddddd....', '....ddssssdd....', '....dssssss.....',
+      '....dsssssss....', '.....ssssss.....', '....aaaaaaa.....', '...aaaaaaaaa....',
+      '..ssaaaaaaas....', '...aaaaaaaa.....', '....aaaaaa......', '...aaddaadd.....',
+      '...addd.ddd.....', '...ddd..ddd.....'],
+  },
+  mario: {
+    idle: [...MARIO_TOP, '...bbb..bbb.....', '..hhhh..hhhh....', '.hhhhh..hhhhh...'],
+    run1: [...MARIO_TOP, '...bbbb.bbb.....', '..hhhh...hhh....', '.hhhh.....hhh...'],
+    run2: [...MARIO_TOP, '....bbbbb.......', '....hhhhh.......', '...hhhhhh.......'],
+    jump: ['....rrrrrr..ss..', '...rrrrrrrrrss..', '...hhhhssss.r...', '..hhshsssssr....',
+      '..hhshhssssrr...', '..hhsssssrr.....', '....ssssssrr....', '...rrrbbrr......',
+      '..rrrrbbrrr.....', '.rrrrbbbbrrr....', '.ssrrbybbybs....', '.sssbbbbbbb.....',
+      '..sbbbbbbbbb....', '..bbbb.bbbb.....', '.hhhh...hhhh....', '.hhh.....hhh....'],
+  },
+  sonic: {
+    idle: [...SONIC_TOP, '.....b.b........', '....bb.bb.......', '....b...b.......',
+      '...rr...rr......', '..rrrw..rrrw....', '.rrrr...rrrr....'],
+    run1: [...SONIC_TOP, '.....b..b.......', '....bb...bb.....', '...rr.....rr....',
+      '..rrrw...rrrw...', '.rrrr.....rrr...'],
+    run2: [...SONIC_TOP, '......bb........', '.....b.b........', '....rr.rr.......',
+      '...rrrwrrrw.....', '...rrr.rrr......'],
+    ball1: ['...bbbbbb...', '..bbbbbbbb..', '.bbwbbbbbbb.', 'bbbwbbbbbbbb',
+      'bbbwbbbbwbbb', 'bbbbwbbwbbbb', 'bbbbwwwbbbbb', 'bbbwbbbwbbbb',
+      'bbwbbbbbwbbb', '.bbbbbbbbbb.', '..bbbbbbbb..', '...bbbbbb...'],
+    ball2: ['...bbbbbb...', '..bbbbwbbb..', '.bbbbbwbbbb.', 'bbbbbbwbbbbb',
+      'bbwbbbbbbbbb', 'bbbwwbbbbbbb', 'bbbbbwwwbbbb', 'bbbbbbbbwbbb',
+      'bbbbbbbbwbbb', '.bbbbbwbbbb.', '..bbbbbbbb..', '...bbbbbb...'],
+  },
+};
+
+/* frameKey → fallback pixel map, per character */
+function fallbackMapFor(charKey, frameKey) {
+  const maps = FALLBACK_MAPS[charKey];
+  if (maps[frameKey]) return maps[frameKey];
+  const n = +frameKey.replace(/\D/g, '') || 1;
+  if (/^ball/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
+  if (/^(walk|frun|run)/.test(frameKey)) return n % 2 ? maps.run1 : maps.run2;
+  return maps.idle;
+}
+
+function buildFallbackSprite(charKey, frameKey) {
+  const rows = fallbackMapFor(charKey, frameKey);
+  const pal = FALLBACK_PALETTES[charKey];
+  const w = Math.max(...rows.map(r => r.length)), h = rows.length;
+  const make = flip => {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    rows.forEach((row, ry) => [...row].forEach((ch, rx) => {
+      if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(flip ? w - 1 - rx : rx, ry, 1, 1); }
+    }));
+    return c;
+  };
+  return { right: make(false), left: make(true), w, h };
+}
+
+function loadSprites() {
+  const jobs = [];
+  for (const [charKey, def] of Object.entries(SPRITE_DEFS)) {
+    SPRITE_CACHE[charKey] = {};
+    for (const [frameKey, file] of Object.entries(def.frames)) {
+      jobs.push(new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          const w = img.naturalWidth, h = img.naturalHeight;
+          const make = flip => {
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const g = c.getContext('2d');
+            if (flip) { g.translate(w, 0); g.scale(-1, 1); }
+            g.drawImage(img, 0, 0);
+            return c;
+          };
+          const a = make(false), b = make(true);
+          SPRITE_CACHE[charKey][frameKey] = def.facesLeft
+            ? { right: b, left: a, w, h } : { right: a, left: b, w, h };
+          resolve();
+        };
+        img.onerror = () => {
+          SPRITE_CACHE[charKey][frameKey] = buildFallbackSprite(charKey, frameKey);
+          resolve();
+        };
+        img.src = `assets/${file}.png`;
+      }));
+    }
+  }
+  return Promise.all(jobs);
+}
+
+/* ----------------------------------------------------------------- physics */
+
+function newPlayerState(x) {
+  return { x, y: GROUND, vx: 0, vy: 0, grounded: true, facing: 1,
+           jumping: false, holdG: 0.125, fallG: 0.4375,
+           takeoffX: x, takeoffY: GROUND };
+}
+
+function hitboxH(charKey, st) {
+  if (charKey === 'sonic' && st.jumping) return 30;      // rolled up
+  const spr = SPRITE_CACHE[charKey] && SPRITE_CACHE[charKey].idle;
+  return spr ? spr.h : 24;
+}
+
+/* One 60 Hz step. `input` = { dir: -1|0|1, run, jumpHeld, jumpPressed }.
+   Update order per the games: control → move → gravity (position is updated
+   with the OLD velocity, then gravity is subtracted — as in the diagram). */
+function stepPhysics(st, charKey, P, input) {
+  const ev = { jumped: false, landed: false };
+  const C = CHARS[charKey];
+
+  /* jump start */
+  if (st.grounded && input.jumpPressed) {
+    st.takeoffX = st.x; st.takeoffY = st.y;
+    if (charKey === 'mario') {
+      const t = C.tiers.find(t => Math.abs(st.vx) >= t.min);
+      st.vy = -t.vy * (P.jumpForce / 4.0);
+      st.holdG = t.hold * (P.holdGravity / 0.125);
+      st.fallG = t.fall * (P.releaseGravity / 0.4375);
+    } else {
+      st.vy = -P.jumpForce;
+    }
+    st.grounded = false; st.jumping = true; ev.jumped = true;
+  }
+
+  /* Sonic's variable jump: checked BEFORE movement and gravity (SPG) */
+  if (charKey === 'sonic' && st.jumping && !input.jumpHeld && st.vy < -P.releaseCap)
+    st.vy = -P.releaseCap;
+
+  /* horizontal control */
+  if (charKey === 'castlevania') {
+    if (st.grounded) st.vx = input.dir * P.walkSpeed;
+    /* airborne: vx locked — the committed jump */
+  } else if (charKey === 'mario') {
+    /* SMB picks one force from {0xE4 run, 0x98 walk, 0xD0 release} and
+       DOUBLES it while facing != moving — that doubling is the skid
+       (0x1A0 = 2×0xD0) and it applies to air turns as well. */
+    if (input.dir !== 0) {
+      const turning = st.vx !== 0 && Math.sign(st.vx) !== input.dir;
+      if (turning) {
+        let rate;
+        if (st.grounded) rate = P.skidDecel;                       // 2 × 0xD0
+        else rate = 2 * (Math.abs(st.vx) >= 1.5625 ? P.runAccel : P.walkAccel);
+        const next = st.vx + input.dir * rate;
+        /* the skid ends crossing zero: flip cleanly to min walk speed */
+        st.vx = Math.sign(next) === input.dir ? input.dir * P.minWalk : next;
+      } else {
+        if (st.grounded && st.vx === 0) st.vx = input.dir * P.minWalk;
+        const cap = !st.grounded || input.run ? P.maxRun : P.maxWalk;
+        if (Math.abs(st.vx) > cap) {    /* over the cap (released B): ease back */
+          st.vx = Math.sign(st.vx) * Math.max(cap, Math.abs(st.vx) - P.releaseDecel);
+        } else {
+          st.vx += input.dir * (st.grounded
+            ? (input.run ? P.runAccel : P.walkAccel)
+            : (Math.abs(st.vx) >= 1.5625 ? P.runAccel : P.walkAccel));
+          if (Math.abs(st.vx) > cap) st.vx = Math.sign(st.vx) * cap;
+        }
+      }
+    } else if (st.grounded && st.vx !== 0) {
+      const d = P.releaseDecel;
+      st.vx = Math.abs(st.vx) <= d ? 0 : st.vx - Math.sign(st.vx) * d;
+    }
+  } else { /* sonic */
+    if (input.dir !== 0) {
+      if (st.grounded && st.vx !== 0 && Math.sign(st.vx) !== input.dir) {
+        st.vx += input.dir * P.decel;                       // braking, 0.5
+      } else if (Math.abs(st.vx) < P.topSpeed || Math.sign(st.vx) !== input.dir) {
+        st.vx += input.dir * P.accel * (st.grounded ? 1 : 2);
+        if (Math.abs(st.vx) > P.topSpeed) st.vx = Math.sign(st.vx) * P.topSpeed;
+      }
+    } else if (st.grounded && st.vx !== 0) {
+      const f = P.friction;
+      st.vx = Math.abs(st.vx) <= f ? 0 : st.vx - Math.sign(st.vx) * f;
+    }
+  }
+  if (input.dir !== 0 && (st.grounded || charKey !== 'castlevania')) st.facing = input.dir;
+
+  /* Mario: refresh gravity tier while grounded (for walking off ledges) */
+  if (charKey === 'mario' && st.grounded) {
+    const t = C.tiers.find(t => Math.abs(st.vx) >= t.min);
+    st.holdG = t.hold * (P.holdGravity / 0.125);
+    st.fallG = t.fall * (P.releaseGravity / 0.4375);
+  }
+
+  /* movement + collision. Sonic 1 quirk: jumping exits the movement cycle,
+     so the player does not move on the frame the jump starts. */
+  const skipMove = charKey === 'sonic' && ev.jumped;
+  if (!skipMove) {
+    const hw = C.hitboxW / 2, hh = hitboxH(charKey, st);
+
+    st.x += st.vx;
+    for (const b of BLOCKS) {
+      if (st.x + hw > b.x && st.x - hw < b.x + b.w && st.y > b.y && st.y - hh < b.y + b.h) {
+        st.x = st.vx > 0 ? b.x - hw : b.x + b.w + hw;
+        st.vx = 0;
+      }
+    }
+    st.x = Math.max(hw + 2, Math.min(W - hw - 2, st.x));
+
+    const prevY = st.y;
+    st.y += st.vy;
+    let onGround = false;
+    if (st.vy >= 0) {
+      if (st.y >= GROUND) { st.y = GROUND; onGround = true; }
+      for (const b of BLOCKS) {
+        if (st.x + hw > b.x && st.x - hw < b.x + b.w && prevY <= b.y && st.y >= b.y) {
+          st.y = b.y; onGround = true;
+        }
+      }
+    } else {
+      for (const b of BLOCKS) {
+        const bottom = b.y + b.h;
+        if (st.x + hw > b.x && st.x - hw < b.x + b.w &&
+            prevY - hh >= bottom && st.y - hh < bottom) {
+          st.y = bottom + hh; st.vy = 0;   /* head bonk */
+        }
+      }
+    }
+
+    if (onGround) {
+      if (!st.grounded) ev.landed = true;
+      st.grounded = true; st.vy = 0; st.jumping = false;
+    } else if (st.grounded) {
+      st.grounded = false;               /* walked off a ledge */
+    }
+  }
+
+  /* gravity — applied AFTER the position update, like the diagram says */
+  if (!st.grounded && !skipMove) {
+    if (charKey === 'mario') {
+      st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
+      if (st.vy > P.terminal) st.vy = P.terminal;
+    } else if (charKey === 'castlevania') {
+      st.vy += P.gravity;
+      if (st.vy > P.terminal) st.vy = P.terminal;
+    } else { /* sonic — no fall speed cap in Sonic 1 */
+      st.vy += P.gravity;
+      if (st.vy < 0 && st.vy > -4)       /* air drag, after gravity (SPG) */
+        st.vx -= Math.trunc(st.vx / 0.125) / 256;
+    }
+  }
+  return ev;
+}
+
+/* Predict the arc if the player jumped right now (holding, or tapping). */
+function predictArc(charKey, P, from, holdFrames, run) {
+  const st = { ...from };
+  const dir = st.vx === 0 ? 0 : Math.sign(st.vx);
+  const pts = [];
+  stepPhysics(st, charKey, P, { dir, run, jumpHeld: true, jumpPressed: true });
+  pts.push({ x: st.x, y: st.y });
+  for (let f = 1; f < 300 && !st.grounded; f++) {
+    stepPhysics(st, charKey, P, { dir, run, jumpHeld: f < holdFrames, jumpPressed: false });
+    pts.push({ x: st.x, y: st.y });
+  }
+  return pts;
+}
+
+/* -------------------------------------------------------------------- state */
+
+let charKey = 'castlevania';
+let P = { ...CHARS.castlevania.defaults };    // live (slider-tweaked) physics
+let player = newPlayerState(70);
+
+let arc = [];          // recorded points of the jump in progress
+let lastArc = [];      // the previous complete jump, kept on screen
+let ghosts = [];       // faded sprite snapshots
+let jumpStart = null;
+let airFrames = 0;
+let takeoffFlash = 0;
+let animClock = 0;
+let slowmo = false;
+let phase = 0;         // 0 grounded · 1 press · 2 rising · 3 peak/fall
+
+const keys = {};
+let jumpQueued = false;
+
+/* ---- auto demo: run, full-hold jump, admire the stats, next character ---- */
+
+const DEMO_JUMP_X = { castlevania: 180, mario: 150, sonic: 170 };
+const demo = { phase: 'off', timer: 0 };
+
+function startDemo() {
+  player = newPlayerState(70);
+  arc = []; lastArc = []; ghosts = [];
+  demo.phase = 'wait'; demo.timer = 30;
+}
+
+function stopDemo() { demo.phase = 'off'; }
+
+function demoInput() {
+  const idle = { dir: 0, run: false, jumpHeld: false, jumpPressed: false };
+  const move = { dir: 1, run: charKey === 'mario', jumpHeld: false, jumpPressed: false };
+  switch (demo.phase) {
+    case 'wait':
+      if (--demo.timer <= 0) demo.phase = 'run';
+      return idle;
+    case 'run':
+      if (player.grounded && player.x >= DEMO_JUMP_X[charKey]) {
+        demo.phase = 'air';
+        return { ...move, jumpHeld: true, jumpPressed: true };
+      }
+      return move;
+    case 'air':
+      if (player.grounded) { demo.phase = 'admire'; demo.timer = 100; return idle; }
+      return { ...move, jumpHeld: true };
+    case 'admire':
+      if (--demo.timer <= 0)
+        selectChar(CHAR_ORDER[(CHAR_ORDER.indexOf(charKey) + 1) % CHAR_ORDER.length]);
+      return idle;
+  }
+  return idle;
+}
+
+/* --------------------------------------------------------------------- DOM */
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const el = id => document.getElementById(id);
+const phaseCards = [...document.querySelectorAll('.phase-card')];
+
+function buildTabs() {
+  const nav = el('char-tabs');
+  for (const key of CHAR_ORDER) {
+    const c = CHARS[key];
+    const btn = document.createElement('button');
+    btn.className = 'char-tab';
+    btn.dataset.char = key;
+    const spr = SPRITE_CACHE[key].idle;
+    if (spr) {
+      const icon = document.createElement('canvas');
+      icon.width = spr.w; icon.height = spr.h;
+      icon.style.width = spr.w * (26 / spr.h) + 'px';
+      icon.style.height = '26px';
+      icon.style.imageRendering = 'pixelated';
+      icon.getContext('2d').drawImage(spr.right, 0, 0);
+      btn.append(icon);
+    }
+    btn.append(document.createTextNode(c.game));
+    btn.addEventListener('click', () => selectChar(key));
+    nav.append(btn);
+  }
+}
+
+function selectChar(key) {
+  charKey = key;
+  P = { ...CHARS[key].defaults };
+  const x = player.x;
+  player = newPlayerState(x);
+  arc = []; lastArc = []; ghosts = []; jumpStart = null;
+  el('stat-apex').textContent = el('stat-air').textContent = el('stat-range').textContent = '—';
+  document.documentElement.style.setProperty('--accent', CHARS[key].accent);
+  document.querySelectorAll('.char-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.char === key));
+  el('explainer').innerHTML = CHARS[key].explainer;
+  el('pseudocode').innerHTML = CHARS[key].pseudocode;
+  buildSliders();
+  const t = el('toggle-demo');
+  if (t && t.checked) startDemo();          // demo restarts its cycle here
+}
+
+function buildSliders() {
+  const box = el('sliders');
+  box.innerHTML = '';
+  for (const s of CHARS[charKey].sliders) {
+    const row = document.createElement('div');
+    row.className = 'slider-row';
+    const label = document.createElement('label');
+    const name = document.createElement('b');
+    name.textContent = s.label;
+    const val = document.createElement('span');
+    val.className = 'val';
+    const input = document.createElement('input');
+    Object.assign(input, { type: 'range', min: s.min, max: s.max, step: s.step, value: P[s.key] });
+    const show = () => val.textContent = (+P[s.key]).toFixed(s.step < 0.01 ? 3 : s.step < 0.1 ? 2 : 1);
+    input.addEventListener('input', () => { P[s.key] = +input.value; show(); });
+    show();
+    label.append(name, val);
+    row.append(label, input);
+    box.append(row);
+  }
+}
+
+el('reset-btn').addEventListener('click', () => { P = { ...CHARS[charKey].defaults }; buildSliders(); });
+
+el('toggle-demo').addEventListener('change', e => e.target.checked ? startDemo() : stopDemo());
+
+const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ']);
+addEventListener('keydown', e => {
+  if (GAME_KEYS.has(e.key)) e.preventDefault();
+  if (e.repeat) return;
+  keys[e.key.toLowerCase()] = true;
+  const k = e.key.toLowerCase();
+  if (['arrowleft', 'arrowright', 'arrowup', 'a', 'd', 'w', 'z', ' '].includes(k)) {
+    const t = el('toggle-demo');               // manual input takes control back
+    if (t && t.checked) { t.checked = false; stopDemo(); }
+  }
+  if (e.key === ' ' || e.key.toLowerCase() === 'z' || e.key === 'ArrowUp' || e.key.toLowerCase() === 'w')
+    jumpQueued = true;
+  if (e.key.toLowerCase() === 's') { slowmo = !slowmo; el('slowmo-badge').classList.toggle('on', slowmo); }
+  if (e.key.toLowerCase() === 'r') { player = newPlayerState(70); arc = []; lastArc = []; ghosts = []; }
+  if (e.key === '1') selectChar('castlevania');
+  if (e.key === '2') selectChar('mario');
+  if (e.key === '3') selectChar('sonic');
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+/* drop stale input when the tab is hidden — the game loop pauses with rAF */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { for (const k in keys) keys[k] = false; jumpQueued = false; }
+});
+
+function readInput() {
+  const left = keys['arrowleft'] || keys['a'];
+  const right = keys['arrowright'] || keys['d'];
+  const jumpHeld = keys[' '] || keys['z'] || keys['arrowup'] || keys['w'];
+  const run = !!keys['shift'];
+  const jumpPressed = jumpQueued;
+  jumpQueued = false;
+  return { dir: (right ? 1 : 0) - (left ? 1 : 0), run, jumpHeld, jumpPressed };
+}
+
+/* -------------------------------------------------------------- simulation */
+
+function tick() {
+  const demoOn = demo.phase !== 'off' && el('toggle-demo').checked;
+  const input = demoOn ? demoInput() : readInput();
+  const ev = stepPhysics(player, charKey, P, input);
+
+  if (ev.jumped) {
+    lastArc = [];
+    arc = [{ x: player.takeoffX, y: player.takeoffY }, { x: player.x, y: player.y }];
+    ghosts = [];
+    jumpStart = { x: player.takeoffX, y: player.takeoffY };
+    airFrames = 1;
+    takeoffFlash = 14;
+  }
+
+  if (player.jumping) {
+    arc.push({ x: player.x, y: player.y });
+    airFrames++;
+    if (airFrames % 2 === 0)
+      ghosts.push({ x: player.x, y: player.y, facing: player.facing,
+                    frame: spriteFrameKey(), alpha: 0.32 });
+  }
+  for (const g of ghosts) g.alpha -= 0.0022;
+  ghosts = ghosts.filter(g => g.alpha > 0.02);
+
+  if (ev.landed && arc.length > 1) {
+    lastArc = arc; arc = [];
+    const apex = jumpStart.y - Math.min(...lastArc.map(p => p.y));
+    el('stat-apex').textContent = `${apex.toFixed(0)} px · ${(apex / TILE).toFixed(1)} tiles`;
+    el('stat-air').textContent = `${airFrames} frames · ${(airFrames / 60).toFixed(2)} s`;
+    el('stat-range').textContent = `${Math.abs(player.x - jumpStart.x).toFixed(0)} px`;
+  }
+
+  if (takeoffFlash > 0) takeoffFlash--;
+  const newPhase = player.grounded ? 0
+    : takeoffFlash > 0 ? 1
+    : player.vy < -0.4 ? 2 : 3;
+  if (newPhase !== phase) {
+    phase = newPhase;
+    phaseCards.forEach(c => c.classList.toggle('active', +c.dataset.phase === phase));
+  }
+
+  animClock++;
+}
+
+const MARIO_WALK = ['run1', 'run2', 'run3'];
+const SONIC_WALK = ['walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6'];
+const SONIC_RUN = ['frun1', 'frun2', 'frun3', 'frun4'];
+const SONIC_BALL = ['ball1', 'ball2', 'ball3', 'ball4'];
+
+function spriteFrameKey() {
+  const speed = Math.abs(player.vx);
+  if (!player.grounded) {
+    if (charKey === 'sonic' && player.jumping) {
+      const d = Math.max(1, Math.floor(4 - Math.min(speed, 3)));   // SPG spin timing
+      return SONIC_BALL[Math.floor(animClock / d) % 4];
+    }
+    return player.jumping ? 'jump' : 'idle';
+  }
+  if (speed > 0.05) {
+    if (charKey === 'sonic') {
+      const d = Math.max(1, Math.floor(8 - speed));                // SPG walk timing
+      const cyc = speed >= 6 ? SONIC_RUN : SONIC_WALK;
+      return cyc[Math.floor(animClock / d) % cyc.length];
+    }
+    if (charKey === 'mario') {
+      const d = Math.max(2, Math.round(10 - speed * 2.5));
+      return MARIO_WALK[Math.floor(animClock / d) % 3];
+    }
+    return MARIO_WALK[Math.floor(animClock / 8) % 3];              // simon
+  }
+  return 'idle';
+}
+
+/* --------------------------------------------------------------- rendering */
+
+function drawArc(pts, color, width, dash) {
+  if (pts.length < 2) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.setLineDash(dash);
+  ctx.beginPath();
+  ctx.moveTo(S(pts[0].x), S(pts[0].y - 1));
+  for (const p of pts) ctx.lineTo(S(p.x), S(p.y - 1));
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawSprite(frameKey, x, y, facing, alpha) {
+  const spr = SPRITE_CACHE[charKey][frameKey];
+  if (!spr) {
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = CHARS[charKey].accent;
+    ctx.fillRect(S(x) - S(6), S(y) - S(24), S(12), S(24));
+    ctx.globalAlpha = 1;
+    return;
+  }
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(facing < 0 ? spr.left : spr.right,
+    S(x) - S(spr.w) / 2, S(y) - S(spr.h), S(spr.w), S(spr.h));
+  ctx.globalAlpha = 1;
+}
+
+function render() {
+  ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+
+  /* ground + soil */
+  ctx.fillStyle = '#efe9da';
+  ctx.fillRect(0, S(GROUND), VIEW_W, VIEW_H - S(GROUND));
+  ctx.strokeStyle = '#2b2019';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, S(GROUND)); ctx.lineTo(VIEW_W, S(GROUND)); ctx.stroke();
+
+  /* height ruler */
+  ctx.font = '12px Georgia';
+  ctx.textAlign = 'left';
+  for (let t = 1; t <= 9; t++) {
+    const y = S(GROUND - t * TILE);
+    ctx.strokeStyle = t % 2 ? '#eee7d6' : '#e0d7c2';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(VIEW_W, y); ctx.stroke();
+    if (t % 2 === 0) { ctx.fillStyle = '#b0a48e'; ctx.fillText(`${t} tiles`, 6, y - 4); }
+  }
+
+  /* blocks */
+  for (const b of BLOCKS) {
+    ctx.fillStyle = '#f0ead9';
+    ctx.fillRect(S(b.x), S(b.y), S(b.w), S(b.h));
+    ctx.strokeStyle = '#b8a888';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(S(b.x), S(b.y), S(b.w), S(b.h));
+    for (let ty = b.y + TILE; ty < b.y + b.h; ty += TILE) {
+      ctx.beginPath(); ctx.moveTo(S(b.x), S(ty)); ctx.lineTo(S(b.x + b.w), S(ty)); ctx.stroke();
+    }
+    ctx.fillStyle = '#8a7b6a';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${b.h / TILE} tiles`, S(b.x + b.w / 2), S(b.y) + 15);
+    ctx.textAlign = 'left';
+  }
+
+  /* predicted arcs (when grounded) */
+  if (el('toggle-predict').checked && player.grounded) {
+    const run = !!keys['shift'];
+    const hold = predictArc(charKey, P, player, 999, run);
+    const variable = charKey !== 'castlevania';
+    drawArc(hold, 'rgba(181,67,42,0.30)', 3, [2, 9]);
+    if (variable) {
+      const tap = predictArc(charKey, P, player, 5, run);
+      drawArc(tap, 'rgba(36,86,224,0.30)', 3, [2, 9]);
+      const top = hold.reduce((m, p) => p.y < m.y ? p : m);
+      ctx.font = 'italic 13px Georgia';
+      ctx.fillStyle = 'rgba(181,67,42,0.55)';
+      ctx.fillText('hold', S(top.x) + 8, S(top.y) - 6);
+      const tapTop = tap.reduce((m, p) => p.y < m.y ? p : m);
+      ctx.fillStyle = 'rgba(36,86,224,0.55)';
+      ctx.fillText('tap', S(tapTop.x) + 8, S(tapTop.y) - 6);
+    }
+  }
+
+  /* the dashed red arc — the star of the diagram */
+  if (el('toggle-arc').checked) {
+    const pts = arc.length > 1 ? arc : lastArc;
+    drawArc(pts, '#b5432a', 4, [9, 8]);
+    if (pts.length > 2) {
+      const apex = pts.reduce((m, p) => p.y < m.y ? p : m);
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#b5432a';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(S(apex.x), S(apex.y - 1), 6, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+  }
+
+  /* ghosts */
+  if (el('toggle-ghosts').checked)
+    for (const g of ghosts) drawSprite(g.frame, g.x, g.y, g.facing, g.alpha);
+
+  drawSprite(spriteFrameKey(), player.x, player.y, player.facing, 1);
+
+  drawHUD();
+}
+
+function drawHUD() {
+  const cx = VIEW_W - 150, held = keys[' '] || keys['z'] || keys['arrowup'] || keys['w'];
+  const vyUp = -player.vy;                       // display convention: up is positive
+  const val = Math.round(vyUp * 10);             // ×10, like the diagram's 40 / 2 units
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#2b2019';
+  ctx.font = '22px Georgia';
+  ctx.fillText('Y Velocity:', cx, 44);
+  ctx.font = 'bold 40px Georgia';
+  ctx.fillStyle = player.grounded || val === 0 ? '#2b2019' : (val > 0 ? '#2e8b3a' : '#c03028');
+  ctx.fillText(val, cx, 86);
+  ctx.font = '11px Georgia';
+  ctx.fillStyle = '#8a7b6a';
+  ctx.fillText('(px/frame × 10)', cx, 103);
+
+  /* velocity arrow, like the green/red arrow in the diagram */
+  const ax = cx - 88, base = 78, len = Math.min(Math.abs(vyUp) * 9, 64);
+  if (len > 2) {
+    const up = vyUp > 0;
+    ctx.fillStyle = up ? '#2e8b3a' : '#c03028';
+    const dir = up ? -1 : 1;
+    ctx.fillRect(ax - 5, up ? base - len : base, 10, len);
+    ctx.beginPath();
+    ctx.moveTo(ax - 12, base + dir * len);
+    ctx.lineTo(ax + 12, base + dir * len);
+    ctx.lineTo(ax, base + dir * (len + 14));
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle = '#c8bfa8';
+    ctx.fillRect(ax - 10, base - 2, 20, 4);
+  }
+
+  /* the A button */
+  const by = 140;
+  ctx.beginPath(); ctx.arc(cx, by + (held ? 2 : 0), 17, 0, Math.PI * 2);
+  ctx.fillStyle = held ? '#4a4440' : '#8d8680'; ctx.fill();
+  ctx.strokeStyle = '#5c554e'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#f2ede4';
+  ctx.font = 'bold 17px Georgia';
+  ctx.fillText('A', cx, by + 6 + (held ? 2 : 0));
+  ctx.font = '11px Georgia';
+  ctx.fillStyle = '#8a7b6a';
+  ctx.fillText(held ? 'jump held' : 'jump', cx, by + 34);
+  ctx.textAlign = 'left';
+}
+
+/* ---------------------------------------------------------------- main loop */
+
+let last = performance.now(), acc = 0;
+function frame(now) {
+  acc += (now - last) * (slowmo ? 0.25 : 1);
+  last = now;
+  acc = Math.min(acc, STEP_MS * 8);
+  while (acc >= STEP_MS) { tick(); acc -= STEP_MS; }
+  render();
+  requestAnimationFrame(frame);
+}
+
+loadSprites().then(() => {
+  buildTabs();
+  selectChar('castlevania');
+  last = performance.now();
+  requestAnimationFrame(frame);
+});

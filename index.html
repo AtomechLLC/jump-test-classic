@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Basics of Jumping — Interactive</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="title-block">
+    <h1>The Basics of Jumping <span class="subtitle">— interactive edition</span></h1>
+    <p class="credit">Inspired by the animated diagram by Celia Wagar · <a href="https://critpoints.net" target="_blank" rel="noopener">Critpoints.net</a></p>
+  </div>
+  <nav id="char-tabs" class="char-tabs"></nav>
+</header>
+
+<main>
+  <section class="stage-col">
+    <div class="phase-cards" id="phase-cards">
+      <div class="phase-card" data-phase="1">
+        <h3>1. Press Jump</h3>
+        <p>Initial jump force is applied to the character as upward Y&nbsp;velocity</p>
+      </div>
+      <div class="phase-card" data-phase="2">
+        <h3>2. Gravity Takes Effect</h3>
+        <p>Each frame, the character moves by their Y&nbsp;velocity, then gravity is subtracted from it</p>
+      </div>
+      <div class="phase-card" data-phase="3">
+        <h3>3. The Peak and Fall</h3>
+        <p>Y&nbsp;velocity reaches 0 and reverses as gravity keeps pulling, accelerating into a fall</p>
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="game" width="1152" height="576"></canvas>
+      <div class="slowmo-badge" id="slowmo-badge">SLOW-MO ¼×</div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar">
+      <span class="stat"><b>Apex</b> <span id="stat-apex">—</span></span>
+      <span class="stat"><b>Airtime</b> <span id="stat-air">—</span></span>
+      <span class="stat"><b>Range</b> <span id="stat-range">—</span></span>
+      <span class="controls-hint">
+        <kbd>←</kbd><kbd>→</kbd> move &nbsp; <kbd>Space</kbd>/<kbd>Z</kbd> jump (hold!) &nbsp;
+        <kbd>Shift</kbd> run (Mario) &nbsp; <kbd>S</kbd> slow-mo &nbsp;
+        <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> character
+      </span>
+    </div>
+  </section>
+
+  <aside class="side-col">
+    <div class="explainer" id="explainer"></div>
+
+    <div class="pseudo-box">
+      <h4>Every frame</h4>
+      <pre id="pseudocode"></pre>
+    </div>
+
+    <div class="tunables">
+      <div class="tunables-head">
+        <h4>Sample values</h4>
+        <button id="reset-btn" title="Restore this character's authentic values">reset</button>
+      </div>
+      <div id="sliders"></div>
+    </div>
+
+    <div class="view-toggles">
+      <label><input type="checkbox" id="toggle-arc" checked> jump arc</label>
+      <label><input type="checkbox" id="toggle-predict" checked> predicted arc</label>
+      <label><input type="checkbox" id="toggle-ghosts" checked> ghost trail</label>
+      <label><input type="checkbox" id="toggle-demo"> auto demo</label>
+    </div>
+  </aside>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
