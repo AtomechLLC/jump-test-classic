@@ -135,6 +135,19 @@ h1 {
 .char-tab canvas { image-rendering: pixelated; }
 .char-tab .tab-label { display: none; }
 .char-tab.active .tab-label { display: inline; }
+.char-tab .tab-key {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: #fff;
+  padding: 0 4px;
+}
+.char-tab.active .tab-key { border-color: var(--accent); color: var(--accent); }
+@media (pointer: coarse) { .char-tab .tab-key { display: none; } }
+.touch .char-tab .tab-key { display: none; }
 .char-tab.active {
   background: #fff;
   color: var(--ink);

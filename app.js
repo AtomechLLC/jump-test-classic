@@ -818,11 +818,15 @@ const phaseCards = [...document.querySelectorAll('.phase-card')];
 
 function buildTabs() {
   const nav = el('char-tabs');
-  for (const key of CHAR_ORDER) {
+  CHAR_ORDER.forEach((key, i) => {
     const c = CHARS[key];
     const btn = document.createElement('button');
     btn.className = 'char-tab';
     btn.dataset.char = key;
+    const num = document.createElement('span');
+    num.className = 'tab-key';
+    num.textContent = i + 1;
+    btn.append(num);
     const spr = SPRITE_CACHE[key].idle;
     if (spr) {
       const icon = document.createElement('canvas');
@@ -841,7 +845,7 @@ function buildTabs() {
     btn.setAttribute('aria-label', c.game);
     btn.addEventListener('click', () => selectChar(key));
     nav.append(btn);
-  }
+  });
 }
 
 function selectChar(key) {
