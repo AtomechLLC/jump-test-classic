@@ -340,12 +340,15 @@ else             yVelocity -= 0.40 <span class="hl">// and right back down</span
       topSpeed: 4.157,
       accel: 0.358,
       friction: 0.179,
-      jumpForce: 4.6,         // first jump of the chain
-      chainWindow: 12,        // frames after landing to continue the chain
+      /* CharacterGravity: GravityStrength 26 units/s², applied the same
+         rising and falling (the arc is symmetric); MaxFallSpeed 38.
+         Launch speed = √(2·g·h) per SeinJump's CalculateSpeedFromHeight. */
+      jumpForce: 4.476,       // √(2·26·3) = 12.49 units/s → px-frame
+      chainWindow: 12,        // m_bunnyHopTimeRemaining = 0.2 s
       airJumpForce: 4.0,
-      holdGravity: 0.17,
-      releaseGravity: 0.4,
-      terminal: 5,
+      gravity: 0.1553,        // 26 units/s² via the 21.5 px/unit anchor
+      sustainDecel: 0.6,      // extra decel while rising, button released
+      terminal: 13.6,         // MaxFallSpeed 38 units/s
       airJumps: 1,            // the Double Jump ability
     },
     /* ground-chain height ratios from the SeinJump source:
@@ -355,17 +358,18 @@ else             yVelocity -= 0.40 <span class="hl">// and right back down</span
       { key: 'jumpForce',      label: 'Initial jump force',    min: 2, max: 8, step: 0.1 },
       { key: 'airJumpForce',   label: 'Air jump force',        min: 1, max: 8, step: 0.1 },
       { key: 'airJumps',       label: 'Air jumps',             min: 0, max: 4, step: 1 },
-      { key: 'holdGravity',    label: 'Gravity (button held)', min: 0.03, max: 0.6, step: 0.005 },
-      { key: 'releaseGravity', label: 'Gravity (released)',    min: 0.03, max: 1.0, step: 0.005 },
+      { key: 'gravity',        label: 'Gravity',               min: 0.03, max: 0.6, step: 0.005 },
+      { key: 'sustainDecel',   label: 'Release decel',         min: 0, max: 2, step: 0.05 },
     ],
     explainer: `
       <h2>The Ori Jump</h2>
       <p>The triple jump lives <i>on the ground</i>: land and jump again
       within a beat and the chain escalates — skip, hop, then a spinning
       flip. The jump heights come straight from the SeinJump source:
-      3, then 3.75, then 4.5 units (a 1 : 1.25 : 1.5 ladder). Miss the
-      window and the chain resets. Each jump is soft-gravity while held,
-      heavy when released, plus one mid-air Double Jump.</p>
+      3, then 3.75, then 4.5 units (a 1 : 1.25 : 1.5 ladder), launched at
+      √(2gh) under one symmetric gravity — the rise and the fall mirror
+      each other. Release early and an extra deceleration trims the rise
+      (the flip only lets you trim half). Plus one mid-air Double Jump.</p>
       <p class="rule"><b>The twist: rhythm.</b> The best height isn't a
       button you hold — it's a beat you keep. Land, jump, land, jump,
       <i>flip.</i></p>`,
@@ -374,9 +378,9 @@ else             yVelocity -= 0.40 <span class="hl">// and right back down</span
 if (jump within window) stage++
 heights: 3 → 3.75 → 4.5 (flip)</span>
 y += yVelocity
-if (rising && jumpHeld)
-      yVelocity -= 0.17
-else  yVelocity -= 0.40`,
+yVelocity -= 0.155 <span class="hl">// same both ways</span>
+if (rising && !jumpHeld)
+      yVelocity -= 0.6 <span class="hl">// sustain cut</span>`,
   },
 };
 
@@ -655,7 +659,7 @@ function newPlayerState(x) {
            sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
            floating: false, freeze: 0, tumble: 0, flapAnim: 0,
            jumpsUsed: 0, airFlip: 0, chainStage: 0, chainTimer: 0,
-           lastChainStage: 0, takeoffX: x, takeoffY: GROUND };
+           lastChainStage: 0, sustain: 0, takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -710,17 +714,20 @@ function stepPhysics(st, charKey, P, input) {
         st.lastChainStage = stage;                     /* skip / hop / flip pose */
         if (stage === 2) st.airFlip = 18;              /* the flip */
         st.chainStage = stage === 2 ? 0 : stage + 1;
-        st.jumpsUsed = 1; st.holdG = P.holdGravity; st.fallG = P.releaseGravity;
+        st.jumpsUsed = 1;
+        /* release-to-shorten budget: full for skip/hop, half for the flip
+           (SeinJump passes jumpSustainMul 1.0 / 1.0 / 0.5) */
+        st.sustain = -st.vy * (stage === 2 ? 0.5 : 1);
       }
     }
     st.grounded = false; st.jumping = true; ev.jumped = true;
   } else if (charKey === 'ori' && input.jumpPressed && !st.grounded &&
              st.jumpsUsed < 1 + P.airJumps) {
-    st.vy = -P.airJumpForce;             /* air jump — the triple-jump chain */
+    st.vy = -P.airJumpForce;             /* the Double Jump */
     st.jumpsUsed++;
     st.jumping = true;
     st.airFlip = 14;
-    st.holdG = P.holdGravity; st.fallG = P.releaseGravity;
+    st.sustain = P.airJumpForce;
   } else if (charKey === 'kirby' && input.jumpPressed && !st.grounded) {
     st.floating = true;                  /* puff up — every press is a flap */
     st.vy = -P.flapImpulse;
@@ -927,8 +934,19 @@ function stepPhysics(st, charKey, P, input) {
 
   /* gravity — applied AFTER the position update, like the diagram says */
   if (!st.grounded && !skipMove) {
-    if (charKey === 'mario' || charKey === 'smw' || charKey === 'ori') {
+    if (charKey === 'mario' || charKey === 'smw') {
       st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
+      if (st.vy > P.terminal) st.vy = P.terminal;
+    } else if (charKey === 'ori') {
+      /* CharacterGravity: one strength, both directions — plus the
+         CharacterJumpSustain cut: released while rising, extra decel
+         drains a per-jump budget */
+      st.vy += P.gravity;
+      if (st.vy < 0 && !input.jumpHeld && st.sustain > 0) {
+        const d = Math.min(P.sustainDecel, st.sustain);
+        st.vy += d; st.sustain -= d;
+      }
+      if (st.vy >= 0) st.sustain = 0;
       if (st.vy > P.terminal) st.vy = P.terminal;
       if (st.airFlip > 0) st.airFlip--;
     } else if (charKey === 'kirby') {

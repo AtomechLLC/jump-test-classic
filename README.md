@@ -155,11 +155,23 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   HorizontalPlatformMovementSettings: MaxSpeed 11.6, Acceleration 60,
   Deceleration 30 units/s, applied identically on the ground and in the
   air — converted via the 3-unit first-jump anchor (21.5 px/unit at
-  60 fps) to 4.157 / 0.358 / 0.179 px-frame values. Frames render at 1:1
+  60 fps) to 4.157 / 0.358 / 0.179 px-frame values. Gravity is sourced
+  from CharacterGravity: GravityStrength 26 units/s² applied the same in
+  both directions (the arc is symmetric — 0.1553 px-frame here) with
+  MaxFallSpeed 38 (13.6 px-frame); launch speeds follow SeinJump's
+  `CalculateSpeedFromHeight` = √(2gh), giving 4.476 px-frame for the
+  first jump. The 12-frame chain window (`m_bunnyHopTimeRemaining` 0.2 s)
+  and variable height are sourced too: releasing jump applies an extra
+  deceleration that can drain at most the launch speed — but only *half*
+  of it on the flip (jumpSustainMul 1.0 / 1.0 / 0.5). Timing was verified
+  against captured gameplay footage: the measured full-jump rise (~28.5
+  frames) matches the source-predicted 28.8, and the arc is symmetric on
+  video as predicted. Frames render at 1:1
   native pixels; the run is the full 13-frame hand-drawn cycle (smear
   frames included) advancing every screen frame, 60 fps. *Approximated:*
-  the chain window (12 frames), the
-  gravity pair, and the Double Jump force. Ori's frames are the game's actual
+  the release deceleration rate (JumpStopDeceleration) and the Double
+  Jump force, both serialized in scene data rather than code. Ori's
+  frames are the game's actual
   hand-drawn animation art, extracted from the `seinPlatformingAtlas`
   textures of a personally owned copy (the game is fully sprite-based);
   a pixel-art placeholder remains as the
