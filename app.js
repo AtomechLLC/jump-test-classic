@@ -28,6 +28,7 @@ const S = v => v * SCALE;
 /* ------------------------------------------------------------------ blocks */
 
 const BLOCKS = [
+  { x: 0, w: 6, h: 4 },       // tiny curb: keeps walkers from wrapping off-screen
   { x: 262, w: 36, h: 32 },   // 2 tiles
   { x: 302, w: 36, h: 48 },   // 3 tiles
   { x: 342, w: 42, h: 64 },   // 4 tiles
@@ -292,28 +293,31 @@ yVelocity -= 0.25`,
     defaults: {
       walkSpeed: 1.296875,   // 332 subpx/frame (TASVideos)
       runSpeed: 1.796875,    // 460 subpx/frame
-      jumpForce: 4.0,        // approximated — see README
-      gravity: 0.140625,     // approximated, floaty ~3.5-tile jump
+      jumpForce: 5.0,        // high force + high rising gravity = upward burst
+      riseGravity: 0.28125,  // higher gravity while ascending
+      fallGravity: 0.09375,  // once Y velocity hits 0, lower gravity is used
+      terminal: 2.5,         // Kirby never falls fast
       releaseCap: 1.5,       // approximated jump cut
-      terminal: 4.5,
-      flapImpulse: 1.75,     // approximated
-      floatGravity: 0.05,
-      floatTerminal: 0.75,   // parachute fall while puffed
+      flapImpulse: 2.0,      // float jumps: low initial force...
+      floatGravity: 0.09375,
+      floatTerminal: 0.75,   // ...and a low capped terminal velocity
       floatSpeed: 0.875,
     },
     sliders: [
       { key: 'jumpForce',     label: 'Initial jump force', min: 2, max: 8, step: 0.0625 },
-      { key: 'gravity',       label: 'Gravity per frame',  min: 0.03, max: 0.6, step: 0.005 },
+      { key: 'riseGravity',   label: 'Gravity (rising)',   min: 0.05, max: 0.6, step: 0.005 },
+      { key: 'fallGravity',   label: 'Gravity (falling)',  min: 0.03, max: 0.6, step: 0.005 },
       { key: 'flapImpulse',   label: 'Flap impulse',       min: 0.5, max: 4, step: 0.125 },
       { key: 'floatTerminal', label: 'Float fall speed',   min: 0.1, max: 3, step: 0.05 },
-      { key: 'walkSpeed',     label: 'Walk speed',         min: 0.5, max: 3, step: 0.05 },
     ],
     explainer: `
       <h2>The Kirby Jump</h2>
-      <p>The fourth answer to variable height: <i>why land at all?</i> A
-      floaty ~3.5-tile jump — then press jump again in mid-air and Kirby
-      puffs up. Every press flaps upward, and while puffed he parachutes
-      down at a fraction of normal fall speed. Forever.</p>
+      <p>Asymmetric gravity, per Celia Wagar's Kirby diagram: a really high
+      initial force <i>and</i> really high gravity while ascending, so Kirby
+      bursts upward — then once Y velocity hits 0, a much lower falling
+      gravity (with a slow fall cap) takes over. Press jump mid-air to puff
+      up: float jumps use a low initial force and a low capped terminal
+      velocity. Forever.</p>
       <p class="rule"><b>The twist: flight as forgiveness.</b> Missed the
       ledge? Flap. Documented quirk: releasing A halts Kirby's movement for
       one frame. Ground speeds are the real 332/460 subpixels per frame;
@@ -322,9 +326,9 @@ yVelocity -= 0.25`,
 `<span class="hl">if (airborne && jumpPressed)
       puffed = true, yVelocity = flap</span>
 y += yVelocity
-if (puffed)
-      yVelocity -= 0.05  <span class="hl">// max fall 0.75</span>
-else  yVelocity -= 0.140625`,
+if (puffed)      yVelocity -= 0.094 <span class="hl">// max fall 0.75</span>
+else if (rising) yVelocity -= 0.281 <span class="hl">// burst up</span>
+else             yVelocity -= 0.094 <span class="hl">// drift down</span>`,
   },
 };
 
@@ -383,10 +387,13 @@ const SPRITE_DEFS = {
     idle: 'mmx_idle',
     run1: 'mmx_run1', run2: 'mmx_run2', run3: 'mmx_run3', run4: 'mmx_run4',
     run5: 'mmx_run5', run6: 'mmx_run6', run7: 'mmx_run7', run8: 'mmx_run8',
+    run9: 'mmx_run9', run10: 'mmx_run10',
     jump: 'mmx_jump', fall: 'mmx_fall', dash: 'mmx_dash' } },
   kirby: { facesLeft: true, frames: {
     idle: 'kirby_idle', walk1: 'kirby_walk1', walk2: 'kirby_walk2',
-    walk3: 'kirby_walk3', jump: 'kirby_jump', fall: 'kirby_fall',
+    walk3: 'kirby_walk3', jump: 'kirby_jump',
+    tumble1: 'kirby_tumble1', tumble2: 'kirby_tumble2',
+    tumble3: 'kirby_tumble3', tumble4: 'kirby_tumble4',
     puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
     puff4: 'kirby_puff4' } },
   sonic: { facesLeft: false, frames: {
@@ -480,7 +487,7 @@ function fallbackMapFor(charKey, frameKey) {
   const maps = FALLBACK_MAPS[charKey];
   if (maps[frameKey]) return maps[frameKey];
   const n = +frameKey.replace(/\D/g, '') || 1;
-  if (/^(ball|puff)/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
+  if (/^(ball|puff|tumble)/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
   if (/jump|fall|spin/.test(frameKey)) return maps.jump || maps.idle;
   if (/^(walk|frun|run)/.test(frameKey)) return n % 2 ? maps.run1 : maps.run2;
   return maps.idle;
@@ -790,9 +797,15 @@ function stepPhysics(st, charKey, P, input) {
     if (charKey === 'mario' || charKey === 'smw') {
       st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
       if (st.vy > P.terminal) st.vy = P.terminal;
-    } else if (charKey === 'kirby' && st.floating) {
-      st.vy += P.floatGravity;           /* puffed: parachute drift */
-      if (st.vy > P.floatTerminal) st.vy = P.floatTerminal;
+    } else if (charKey === 'kirby') {
+      if (st.floating) {
+        st.vy += P.floatGravity;         /* puffed: parachute drift */
+        if (st.vy > P.floatTerminal) st.vy = P.floatTerminal;
+      } else {
+        /* asymmetric: burst up under high gravity, drift down under low */
+        st.vy += st.vy < 0 ? P.riseGravity : P.fallGravity;
+        if (st.vy > P.terminal) st.vy = P.terminal;
+      }
     } else if (charKey !== 'sonic') {   /* plain gravity + terminal cap */
       st.vy += P.gravity;
       if (st.vy > P.terminal) st.vy = P.terminal;
@@ -843,12 +856,12 @@ let jumpQueued = false;
 
 const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170,
                       metroid: 165, megaman: 180, megamanx: 165, kirby: 170 };
-const demo = { phase: 'off', timer: 0 };
+const demo = { phase: 'off', timer: 0, pinned: false, flutterDone: false };
 
 function startDemo() {
   player = newPlayerState(70);
   arc = []; lastArc = []; ghosts = [];
-  demo.phase = 'wait'; demo.timer = 30;
+  demo.phase = 'wait'; demo.timer = 30; demo.flutterDone = false;
 }
 
 function stopDemo() { demo.phase = 'off'; }
@@ -868,16 +881,25 @@ function demoInput() {
       }
       return move;
     case 'air': {
-      if (player.grounded) { demo.phase = 'admire'; demo.timer = 100; return idle; }
+      if (player.grounded) {
+        if (charKey === 'kirby' && !demo.flutterDone) {
+          /* Kirby's showcase, act two: jump again and spam flaps to flutter */
+          demo.flutterDone = true;
+          demo.timer = 0;
+          return { ...move, jumpHeld: true, jumpPressed: true };
+        }
+        demo.phase = 'admire'; demo.timer = 100; return idle;
+      }
       demo.timer++;
-      /* Kirby's showcase: flap a few times whenever the fall picks up speed */
-      const flap = charKey === 'kirby' && demo.timer > 15 && demo.timer < 130 &&
-                   player.vy > 0.6;
+      const flap = charKey === 'kirby' && demo.flutterDone &&
+                   demo.timer > 10 && demo.timer < 150 && player.vy > 0.4;
       return { ...move, jumpHeld: true, jumpPressed: flap };
     }
     case 'admire':
-      if (--demo.timer <= 0)
-        selectChar(CHAR_ORDER[(CHAR_ORDER.indexOf(charKey) + 1) % CHAR_ORDER.length]);
+      if (--demo.timer <= 0) {
+        if (demo.pinned) startDemo();    /* loop the chosen character */
+        else selectChar(CHAR_ORDER[(CHAR_ORDER.indexOf(charKey) + 1) % CHAR_ORDER.length], true);
+      }
       return idle;
   }
   return idle;
@@ -924,7 +946,7 @@ function buildTabs() {
   });
 }
 
-function selectChar(key) {
+function selectChar(key, viaDemo) {
   charKey = key;
   P = { ...CHARS[key].defaults };
   const x = player.x;
@@ -938,7 +960,10 @@ function selectChar(key) {
   el('pseudocode').innerHTML = CHARS[key].pseudocode;
   buildSliders();
   const t = el('toggle-demo');
-  if (t && t.checked) startDemo();          // demo restarts its cycle here
+  if (t && t.checked) {
+    if (!viaDemo) demo.pinned = true;       // hand-picked: loop this character
+    startDemo();
+  }
 }
 
 function buildSliders() {
@@ -965,7 +990,10 @@ function buildSliders() {
 
 el('reset-btn').addEventListener('click', () => { P = { ...CHARS[charKey].defaults }; buildSliders(); });
 
-el('toggle-demo').addEventListener('change', e => e.target.checked ? startDemo() : stopDemo());
+el('toggle-demo').addEventListener('change', e => {
+  if (e.target.checked) { demo.pinned = false; startDemo(); }  /* fresh cycle */
+  else stopDemo();
+});
 
 el('toggle-coyote').addEventListener('change', e => { ASSISTS.coyote = e.target.checked; });
 el('toggle-buffer').addEventListener('change', e => { ASSISTS.buffer = e.target.checked; });
@@ -1134,7 +1162,8 @@ function spriteFrameKey() {
     if (charKey === 'megamanx') return player.vy < 0 ? 'jump' : 'fall';
     if (charKey === 'kirby') {
       if (player.floating) return 'puff' + ((Math.floor(animClock / 5) % 4) + 1);
-      return player.vy < 0 ? 'jump' : 'fall';
+      if (player.vy < 0) return 'jump';
+      return 'tumble' + ((Math.floor(animClock / 4) % 4) + 1);  // the flip
     }
     return player.jumping ? 'jump' : 'idle';
   }
@@ -1151,7 +1180,7 @@ function spriteFrameKey() {
     }
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05) return 'dash';
-      return 'run' + ((Math.floor(animClock / 4) % 8) + 1);
+      return 'run' + ((Math.floor(animClock / 4) % 10) + 1);
     }
     if (charKey === 'sonic') {
       const d = Math.max(1, Math.floor(8 - speed));                // SPG walk timing
@@ -1243,10 +1272,12 @@ function render() {
     for (let ty = b.y + TILE; ty < b.y + b.h; ty += TILE) {
       ctx.beginPath(); ctx.moveTo(S(b.x), S(ty)); ctx.lineTo(S(b.x + b.w), S(ty)); ctx.stroke();
     }
-    ctx.fillStyle = '#8a7b6a';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${b.h / TILE} tiles`, S(b.x + b.w / 2), S(b.y) + 15);
-    ctx.textAlign = 'left';
+    if (b.h >= TILE) {
+      ctx.fillStyle = '#8a7b6a';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${b.h / TILE} tiles`, S(b.x + b.w / 2), S(b.y) + 15);
+      ctx.textAlign = 'left';
+    }
   }
 
   /* predicted arcs (when grounded) */
@@ -1363,7 +1394,7 @@ function frame(now) {
 
 loadSprites().then(() => {
   buildTabs();
-  selectChar('castlevania');
+  selectChar('castlevania', true);
   last = performance.now();
   requestAnimationFrame(frame);
 });

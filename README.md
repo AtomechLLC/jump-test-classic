@@ -131,9 +131,13 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
 - **Kirby's Adventure** ([TASVideos resources](https://tasvideos.org/GameResources/NES/KirbysAdventure)):
   walk 332 and run 460 subpx/frame (1.296875 / 1.796875 px/f), and the
   documented quirk that releasing A halts movement for one frame, are
-  sourced. *Approximated (feel-fitted):* jump force 4.0, gravity 0.140625,
-  release cut, flap impulse, and the float's 0.05 gravity / 0.75 fall cap —
-  Kirby's vertical constants aren't publicly documented.
+  sourced. The vertical model follows Celia Wagar's Kirby jump diagram:
+  high initial force with high gravity while ascending (an upward burst),
+  a much lower gravity once Y velocity reaches 0, and float jumps with a
+  low initial force under a low capped terminal velocity. *Approximated
+  (feel-fitted):* the specific constants (5.0 force, 0.28125 rise /
+  0.09375 fall gravity, 2.5 fall cap, 2.0 flap, 0.75 float cap) — exact
+  values aren't publicly documented.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
