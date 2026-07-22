@@ -4,6 +4,8 @@ An interactive recreation of Celia Wagar's animated diagram about jump physics
 ([critpoints.net](https://critpoints.net)), extended to compare three classic
 jump models side by side.
 
+**▶ Live demo:** <https://atomechllc.github.io/jump-test-classic/>
+
 ## Run it
 
 Any static server works — no build step:
