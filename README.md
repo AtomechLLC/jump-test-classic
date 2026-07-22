@@ -50,6 +50,24 @@ what the original games do) — and differ in what happens around the button:
   release while rising faster than 4 px/frame and upward speed snaps to 4.
   Momentum-heavy ground movement (accel 0.046875, top speed 6) stretches the
   same 6.5 jump force into wildly different arcs.
+- **Super Metroid (Samus)** — variable height by *stopping*: release while
+  rising and upward speed is set straight to 0. Floaty 0.109375 gravity both
+  ways gives a ~7-tile apex and 1.5 s of hang time. Air control is capped at
+  1.375 px/f but ground momentum is kept; hold run to build the +2 px/f dash.
+  Moving jumps somersault.
+
+## Game-feel assists
+
+Two modern platformer assists are layered on top of all five characters,
+each with its own checkbox (on by default) so you can feel the difference:
+
+- **Coyote time** — jumping still works for 6 frames after walking off a
+  ledge (never after a jump).
+- **Jump buffer** — a jump pressed up to 6 frames before landing is
+  remembered and fires on touchdown.
+
+A small label floats up from the takeoff point whenever a jump was granted
+by an assist. None of the five original games have either mechanic.
 
 ## Accuracy notes
 
@@ -81,6 +99,15 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   which these values reproduce. *Approximated:* P-meter fill timing (~80
   frames from standstill is documented; the meter model here is simplified),
   skid rate, the 0-1-0-1-2 speed oscillation quirk, and the fall-speed cap.
+- **Super Metroid** ([supermetroid.run](https://wiki.supermetroid.run/Horizontal_Speed) /
+  [speedga.me](https://wiki.speedga.me/Vertical_Speed) wikis, NTSC values;
+  their `pixels.subpixels` notation is 65536ths, converted here): walk 2.75,
+  run 4.75 (walk + 2.0 dash built at the documented 0.0625/frame over ~32
+  frames), jump 4.875, gravity 0.109375 rising and falling, fall cap
+  5.03125, air-control caps 1.25/1.375. *Approximated:* ground accel/decel
+  and air accel (not documented), and the release-to-stop transition (the
+  real game passes through a brief falling-transition state). No hi-jump
+  boots, water physics, or wall jumps.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
@@ -101,7 +128,8 @@ Frames were sliced (scripts in `tools/`) from sheets on
 [The Spriters Resource](https://www.spriters-resource.com/): Mario & Luigi
 (SMB, NES) ripped by SuperJustinBros; Mario (Super Mario World, SNES) by
 Mister Man; Simon Belmont (Castlevania, NES) by Mister Mike; Sonic (Sonic
-the Hedgehog, Genesis) by Triangly. If `assets/`
+the Hedgehog, Genesis) by Triangly; Samus Aran (Super Metroid, SNES)
+uploaded by "Barack Obama". Metroid is © Nintendo as well. If `assets/`
 is removed, the app automatically falls back to built-in placeholder pixel
 art, so the sample keeps running either way.
 

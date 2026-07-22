@@ -180,9 +180,53 @@ y         += yVelocity
 yVelocity -= gravity
 <span class="hl">// then air drag while -4 &lt; yVel &lt; 0</span>`,
   },
+
+  metroid: {
+    name: 'Samus', game: 'Super Metroid', accent: '#c2571d',
+    hitboxW: 14,
+    defaults: {
+      walkSpeed: 2.75,      // NTSC "2.49152" in px.subpx notation
+      accel: 0.3,           // approximated — Samus reaches walk speed quickly
+      dashAccel: 0.0625,    // documented: 4096 subpx/frame while dash held
+      dashMax: 2.0,         // run = walk + full dash = 4.75 px/f
+      airCap: 1.375,        // air-control cap ("1.24576"); momentum is kept
+      airAccel: 0.125,      // approximated
+      jumpForce: 4.875,     // "4.57344"
+      gravity: 0.109375,    // 7168 subpx — same rising and falling
+      terminal: 5.03125,    // "5.02048" fall cap, NTSC
+    },
+    sliders: [
+      { key: 'jumpForce', label: 'Initial jump force', min: 2, max: 8, step: 0.0625 },
+      { key: 'gravity',   label: 'Gravity per frame',  min: 0.03, max: 0.6, step: 0.005 },
+      { key: 'walkSpeed', label: 'Walk speed',         min: 1, max: 4, step: 0.05 },
+      { key: 'dashMax',   label: 'Dash bonus (run)',   min: 0, max: 4, step: 0.125 },
+      { key: 'airCap',    label: 'Air-control cap',    min: 0.25, max: 4, step: 0.125 },
+    ],
+    explainer: `
+      <h2>The Super Metroid Jump</h2>
+      <p>The third way to vary height (the diagram names all three): <i>release
+      to stop</i>. Let go of jump while rising and upward speed is set
+      straight to 0 — the ascent simply ends. Gravity is a floaty 0.109375
+      both ways (half of Sonic's), so the full 4.875 jump force buys a
+      ~7-tile apex and 1.5 seconds of hang time. Zebes moon-gravity.</p>
+      <p class="rule"><b>The twist: momentum vs. air control.</b> Air steering
+      is capped at 1.375 px/f — but speed carried from the ground is kept.
+      Hold <kbd>Shift</kbd> to dash (+2 px/f built over ~32 frames on top of
+      the 2.75 walk), and a moving jump becomes a somersault.</p>`,
+    pseudocode:
+`<span class="hl">if (!jumpHeld && rising)
+      yVelocity = 0   // ascent ends</span>
+y         += yVelocity
+yVelocity -= 0.109375 <span class="hl">// floaty, both ways</span>`,
+  },
 };
 
-const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic'];
+const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid'];
+
+/* ---- modern game-feel assists (toggleable, applied to every character) ---- */
+const COYOTE_FRAMES = 6;   // grace window after walking off a ledge
+const BUFFER_FRAMES = 6;   // early jump press remembered until landing
+const ASSISTS = { coyote: true, buffer: true };   // synced from checkboxes
 
 /* SMW jump force scales with |vx|: 77/82/87/92 subpx at standstill /
    walk max (21) / run max (37) / sprint max (49) — interpolated between. */
@@ -215,6 +259,16 @@ const SPRITE_DEFS = {
     idle: 'smw_idle', walk1: 'smw_walk1', walk2: 'smw_walk2',
     run1: 'smw_run1', run2: 'smw_run2',
     jump: 'smw_jump', fall: 'smw_fall', runjump: 'smw_runjump' } },
+  metroid: { facesLeft: false, frames: {
+    idle: 'samus_idle',
+    run1: 'samus_run1', run2: 'samus_run2', run3: 'samus_run3',
+    run4: 'samus_run4', run5: 'samus_run5', run6: 'samus_run6',
+    run7: 'samus_run7', run8: 'samus_run8', run9: 'samus_run9',
+    run10: 'samus_run10',
+    jump: 'samus_jump', fall: 'samus_fall',
+    spin1: 'samus_spin1', spin2: 'samus_spin2', spin3: 'samus_spin3',
+    spin4: 'samus_spin4', spin5: 'samus_spin5', spin6: 'samus_spin6',
+    spin7: 'samus_spin7', spin8: 'samus_spin8' } },
   sonic: { facesLeft: false, frames: {
     idle: 'sonic_idle',
     walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
@@ -292,6 +346,8 @@ const FALLBACK_MAPS = {
 
 FALLBACK_MAPS.smw = FALLBACK_MAPS.mario;        // same silhouette works fine
 FALLBACK_PALETTES.smw = FALLBACK_PALETTES.mario;
+FALLBACK_MAPS.metroid = FALLBACK_MAPS.castlevania;   // tall silhouette
+FALLBACK_PALETTES.metroid = { d: '#7a2010', a: '#d8b020', s: '#e08030' };
 
 /* frameKey → fallback pixel map, per character */
 function fallbackMapFor(charKey, frameKey) {
@@ -299,7 +355,7 @@ function fallbackMapFor(charKey, frameKey) {
   if (maps[frameKey]) return maps[frameKey];
   const n = +frameKey.replace(/\D/g, '') || 1;
   if (/^ball/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
-  if (/jump|fall/.test(frameKey)) return maps.jump || maps.idle;
+  if (/jump|fall|spin/.test(frameKey)) return maps.jump || maps.idle;
   if (/^(walk|frun|run)/.test(frameKey)) return n % 2 ? maps.run1 : maps.run2;
   return maps.idle;
 }
@@ -357,8 +413,9 @@ function loadSprites() {
 
 function newPlayerState(x) {
   return { x, y: GROUND, vx: 0, vy: 0, grounded: true, facing: 1,
-           jumping: false, holdG: 0.125, fallG: 0.4375, pMeter: 0,
-           sprintJump: false, takeoffX: x, takeoffY: GROUND };
+           jumping: false, holdG: 0.125, fallG: 0.4375, pMeter: 0, dash: 0,
+           sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
+           takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -371,11 +428,21 @@ function hitboxH(charKey, st) {
    Update order per the games: control → move → gravity (position is updated
    with the OLD velocity, then gravity is subtracted — as in the diagram). */
 function stepPhysics(st, charKey, P, input) {
-  const ev = { jumped: false, landed: false };
+  const ev = { jumped: false, landed: false, assist: null };
   const C = CHARS[charKey];
 
-  /* jump start */
-  if (st.grounded && input.jumpPressed) {
+  /* assist timers */
+  if (st.jumpBuffer > 0) st.jumpBuffer--;
+  if (!st.grounded && st.coyoteTimer > 0) st.coyoteTimer--;
+
+  /* jump start — directly, via a buffered early press, or via coyote time */
+  const buffered = ASSISTS.buffer && st.grounded && st.jumpBuffer > 0;
+  const coyote = ASSISTS.coyote && !st.grounded && !st.jumping &&
+                 st.coyoteTimer > 0 && input.jumpPressed;
+  if ((st.grounded && (input.jumpPressed || buffered)) || coyote) {
+    ev.assist = coyote ? 'coyote time!'
+      : (buffered && !input.jumpPressed ? 'buffered!' : null);
+    st.jumpBuffer = 0; st.coyoteTimer = 0;
     st.takeoffX = st.x; st.takeoffY = st.y;
     if (charKey === 'mario') {
       const t = C.tiers.find(t => Math.abs(st.vx) >= t.min);
@@ -389,13 +456,20 @@ function stepPhysics(st, charKey, P, input) {
       st.sprintJump = Math.abs(st.vx) >= P.maxRun + 0.05;
     } else {
       st.vy = -P.jumpForce;
+      if (charKey === 'metroid') st.spinJump = Math.abs(st.vx) > 0.2;
     }
     st.grounded = false; st.jumping = true; ev.jumped = true;
+  } else if (ASSISTS.buffer && input.jumpPressed && !st.grounded) {
+    st.jumpBuffer = BUFFER_FRAMES;       /* remember the early press */
   }
 
   /* Sonic's variable jump: checked BEFORE movement and gravity (SPG) */
   if (charKey === 'sonic' && st.jumping && !input.jumpHeld && st.vy < -P.releaseCap)
     st.vy = -P.releaseCap;
+
+  /* Samus's variable jump: release while rising and the ascent just ends */
+  if (charKey === 'metroid' && st.jumping && !input.jumpHeld && st.vy < 0)
+    st.vy = 0;
 
   /* horizontal control */
   if (charKey === 'castlevania') {
@@ -456,6 +530,28 @@ function stepPhysics(st, charKey, P, input) {
     } else if (st.grounded && st.vx !== 0) {
       const d = P.releaseDecel;
       st.vx = Math.abs(st.vx) <= d ? 0 : st.vx - Math.sign(st.vx) * d;
+    }
+  } else if (charKey === 'metroid') {
+    /* dash builds +dashAccel per frame while held on the ground; released → 0 */
+    if (st.grounded) {
+      if (input.run && input.dir !== 0)
+        st.dash = Math.min(P.dashMax, st.dash + P.dashAccel);
+      else st.dash = 0;
+    }
+    if (input.dir !== 0) {
+      const turning = st.vx !== 0 && Math.sign(st.vx) !== input.dir;
+      if (st.grounded) {
+        st.vx += input.dir * (turning ? P.accel * 2 : P.accel);
+        const cap = P.walkSpeed + (input.run ? st.dash : 0);
+        if (Math.abs(st.vx) > cap)
+          st.vx = Math.sign(st.vx) * Math.max(cap, Math.abs(st.vx) - P.accel);
+      } else if (turning) {
+        st.vx += input.dir * P.airAccel;
+      } else if (Math.abs(st.vx) < P.airCap) {
+        st.vx = Math.min(P.airCap, Math.abs(st.vx) + P.airAccel) * input.dir;
+      } /* above the cap: ground momentum is kept, no air gain */
+    } else if (st.grounded && st.vx !== 0) {
+      st.vx = Math.abs(st.vx) <= P.accel ? 0 : st.vx - Math.sign(st.vx) * P.accel;
     }
   } else { /* sonic */
     if (input.dir !== 0) {
@@ -524,6 +620,7 @@ function stepPhysics(st, charKey, P, input) {
       st.grounded = true; st.vy = 0; st.jumping = false;
     } else if (st.grounded) {
       st.grounded = false;               /* walked off a ledge */
+      st.coyoteTimer = COYOTE_FRAMES;
     }
   }
 
@@ -532,7 +629,7 @@ function stepPhysics(st, charKey, P, input) {
     if (charKey === 'mario' || charKey === 'smw') {
       st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
       if (st.vy > P.terminal) st.vy = P.terminal;
-    } else if (charKey === 'castlevania') {
+    } else if (charKey === 'castlevania' || charKey === 'metroid') {
       st.vy += P.gravity;
       if (st.vy > P.terminal) st.vy = P.terminal;
     } else { /* sonic — no fall speed cap in Sonic 1 */
@@ -567,6 +664,7 @@ let player = newPlayerState(70);
 let arc = [];          // recorded points of the jump in progress
 let lastArc = [];      // the previous complete jump, kept on screen
 let ghosts = [];       // faded sprite snapshots
+let assistFlashes = []; // floating "coyote time!"/"buffered!" labels
 let jumpStart = null;
 let airFrames = 0;
 let takeoffFlash = 0;
@@ -579,7 +677,7 @@ let jumpQueued = false;
 
 /* ---- auto demo: run, full-hold jump, admire the stats, next character ---- */
 
-const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170 };
+const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170, metroid: 165 };
 const demo = { phase: 'off', timer: 0 };
 
 function startDemo() {
@@ -592,7 +690,7 @@ function stopDemo() { demo.phase = 'off'; }
 
 function demoInput() {
   const idle = { dir: 0, run: false, jumpHeld: false, jumpPressed: false };
-  const move = { dir: 1, run: charKey === 'mario' || charKey === 'smw', jumpHeld: false, jumpPressed: false };
+  const move = { dir: 1, run: charKey !== 'castlevania' && charKey !== 'sonic', jumpHeld: false, jumpPressed: false };
   switch (demo.phase) {
     case 'wait':
       if (--demo.timer <= 0) demo.phase = 'run';
@@ -689,6 +787,9 @@ el('reset-btn').addEventListener('click', () => { P = { ...CHARS[charKey].defaul
 
 el('toggle-demo').addEventListener('change', e => e.target.checked ? startDemo() : stopDemo());
 
+el('toggle-coyote').addEventListener('change', e => { ASSISTS.coyote = e.target.checked; });
+el('toggle-buffer').addEventListener('change', e => { ASSISTS.buffer = e.target.checked; });
+
 const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ']);
 addEventListener('keydown', e => {
   if (GAME_KEYS.has(e.key)) e.preventDefault();
@@ -707,6 +808,7 @@ addEventListener('keydown', e => {
   if (e.key === '2') selectChar('mario');
   if (e.key === '3') selectChar('smw');
   if (e.key === '4') selectChar('sonic');
+  if (e.key === '5') selectChar('metroid');
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -739,7 +841,12 @@ function tick() {
     jumpStart = { x: player.takeoffX, y: player.takeoffY };
     airFrames = 1;
     takeoffFlash = 14;
+    if (ev.assist)
+      assistFlashes.push({ text: ev.assist, x: player.takeoffX,
+                           y: player.takeoffY - hitboxH(charKey, player) - 6, t: 55 });
   }
+  for (const f of assistFlashes) f.t--;
+  assistFlashes = assistFlashes.filter(f => f.t > 0);
 
   if (player.jumping) {
     arc.push({ x: player.x, y: player.y });
@@ -787,9 +894,18 @@ function spriteFrameKey() {
     }
     if (charKey === 'smw')
       return player.vy < 0 ? (player.sprintJump ? 'runjump' : 'jump') : 'fall';
+    if (charKey === 'metroid') {
+      if (player.jumping && player.spinJump)
+        return 'spin' + ((Math.floor(animClock / 3) % 8) + 1);
+      return player.vy < 0 ? 'jump' : 'fall';
+    }
     return player.jumping ? 'jump' : 'idle';
   }
   if (speed > 0.05) {
+    if (charKey === 'metroid') {
+      const d = Math.max(2, Math.round(5 - speed * 0.6));
+      return 'run' + ((Math.floor(animClock / d) % 10) + 1);
+    }
     if (charKey === 'sonic') {
       const d = Math.max(1, Math.floor(8 - speed));                // SPG walk timing
       const cyc = speed >= 6 ? SONIC_RUN : SONIC_WALK;
@@ -924,6 +1040,17 @@ function render() {
     for (const g of ghosts) drawSprite(g.frame, g.x, g.y, g.facing, g.alpha);
 
   drawSprite(spriteFrameKey(), player.x, player.y, player.facing, 1);
+
+  /* assist labels float up and fade */
+  ctx.font = 'italic 15px Georgia';
+  ctx.textAlign = 'center';
+  for (const f of assistFlashes) {
+    ctx.globalAlpha = Math.min(1, f.t / 25);
+    ctx.fillStyle = CHARS[charKey].accent;
+    ctx.fillText(f.text, S(f.x), S(f.y) - (55 - f.t) * 0.6);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
 
   drawHUD();
 }
