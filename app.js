@@ -332,11 +332,15 @@ else             yVelocity -= 0.094 <span class="hl">// drift down</span>`,
 
   ori: {
     name: 'Ori', game: 'Ori and the Blind Forest', accent: '#4aa8d8',
-    hitboxW: 12,
+    hitboxW: 16,
     defaults: {
-      topSpeed: 2.8,          // movement feel-fitted — see README
-      accel: 0.3,
-      friction: 0.35,
+      /* HorizontalPlatformMovementSettings: MaxSpeed 11.6, Acceleration 60,
+         Deceleration 30 (units/s), converted via the 3-unit jump anchor
+         (21.5 px/unit at 60 fps). The same set applies on the ground and
+         in the air. */
+      topSpeed: 4.157,
+      accel: 0.358,
+      friction: 0.179,
       jumpForce: 4.6,         // first jump of the chain
       chainWindow: 12,        // frames after landing to continue the chain
       airJumpForce: 4.0,
@@ -441,10 +445,11 @@ const SPRITE_DEFS = {
     tumble3: 'kirby_tumble3',
     puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
     puff4: 'kirby_puff4' } },
-  /* Ori's frames ship at the game's native resolution; `scale` maps them
-     to world pixels and the renderer downsamples smoothly at draw time. */
-  ori: { facesLeft: false, scale: 26 / 120, frames: {
+  /* Ori's frames ship at the game's native resolution and draw at 1:1
+     screen pixels (scale = 1/SCALE), so no resampling ever happens. */
+  ori: { facesLeft: false, scale: 1 / SCALE, frames: {
     idle: 'ori_idle', run1: 'ori_run1', run2: 'ori_run2',
+    run3: 'ori_run3', run4: 'ori_run4',
     skip: 'ori_skip', hop: 'ori_hop', flip: 'ori_flip',
     fall: 'ori_fall' } },
   sonic: { facesLeft: false, frames: {
@@ -458,7 +463,7 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 5;         // bump when sprite files change, so caches can't
+const ASSET_V = 6;         // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -624,8 +629,8 @@ function loadSprites() {
           const k = def.scale || 1;                 /* native-res art: world
                                                        dims shrink, source
                                                        stays full detail */
-          const entry = { w: Math.round(w * k), h: Math.round(h * k),
-                          smooth: !!def.scale };
+          const entry = { w: def.scale ? w * k : w, h: def.scale ? h * k : h,
+                          smooth: !!def.scale };    /* exact fractions → 1:1 */
           if (def.facesLeft) { entry.right = b; entry.left = a; }
           else { entry.right = a; entry.left = b; }
           SPRITE_CACHE[charKey][frameKey] = entry;
@@ -823,7 +828,7 @@ function stepPhysics(st, charKey, P, input) {
       const turning = st.vx !== 0 && Math.sign(st.vx) !== input.dir;
       st.vx += input.dir * P.accel * (turning ? 2 : 1);
       if (Math.abs(st.vx) > P.topSpeed) st.vx = Math.sign(st.vx) * P.topSpeed;
-    } else if (st.grounded && st.vx !== 0) {
+    } else if (st.vx !== 0) {            /* source decelerates in air too */
       const f = P.friction;
       st.vx = Math.abs(st.vx) <= f ? 0 : st.vx - Math.sign(st.vx) * f;
     }
@@ -1337,7 +1342,7 @@ function spriteFrameKey() {
       return 'walk' + ((Math.floor(animClock / d) % 3) + 1);
     }
     if (charKey === 'ori')
-      return 'run' + ((Math.floor(animClock / 5) % 2) + 1);
+      return 'run' + ((Math.floor(animClock / 4) % 4) + 1);
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05) return 'dash';
       return 'run' + ((Math.floor(animClock / 4) % 10) + 1);

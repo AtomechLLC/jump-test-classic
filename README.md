@@ -150,8 +150,13 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   SecondJumpHeight 3.75, ThirdJumpHeight 4.5 (a 1 : 1.25 : 1.5 ladder,
   read from the SeinJump controller in a fan-provided Will of the Wisps
   source tree; jump velocities here scale as √height to preserve the
-  ratios). *Approximated:* the chain window (12 frames), movement speeds,
-  the gravity pair, and the Double Jump force. Ori's frames are the game's actual
+  ratios). Movement is sourced too, from
+  HorizontalPlatformMovementSettings: MaxSpeed 11.6, Acceleration 60,
+  Deceleration 30 units/s, applied identically on the ground and in the
+  air — converted via the 3-unit first-jump anchor (21.5 px/unit at
+  60 fps) to 4.157 / 0.358 / 0.179 px-frame values. Frames render at 1:1
+  native pixels. *Approximated:* the chain window (12 frames), the
+  gravity pair, and the Double Jump force. Ori's frames are the game's actual
   hand-drawn animation art, extracted from the `seinPlatformingAtlas`
   textures of a personally owned copy (the game is fully sprite-based) and
   downscaled to the sample's scale; a pixel-art placeholder remains as the
