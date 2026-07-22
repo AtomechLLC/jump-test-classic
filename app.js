@@ -285,9 +285,50 @@ if (!jumpHeld && rising)
 y         += yVelocity
 yVelocity -= 0.25`,
   },
+
+  kirby: {
+    name: 'Kirby', game: "Kirby's Adventure", accent: '#e0679f',
+    hitboxW: 13,
+    defaults: {
+      walkSpeed: 1.296875,   // 332 subpx/frame (TASVideos)
+      runSpeed: 1.796875,    // 460 subpx/frame
+      jumpForce: 4.0,        // approximated — see README
+      gravity: 0.140625,     // approximated, floaty ~3.5-tile jump
+      releaseCap: 1.5,       // approximated jump cut
+      terminal: 4.5,
+      flapImpulse: 1.75,     // approximated
+      floatGravity: 0.05,
+      floatTerminal: 0.75,   // parachute fall while puffed
+      floatSpeed: 0.875,
+    },
+    sliders: [
+      { key: 'jumpForce',     label: 'Initial jump force', min: 2, max: 8, step: 0.0625 },
+      { key: 'gravity',       label: 'Gravity per frame',  min: 0.03, max: 0.6, step: 0.005 },
+      { key: 'flapImpulse',   label: 'Flap impulse',       min: 0.5, max: 4, step: 0.125 },
+      { key: 'floatTerminal', label: 'Float fall speed',   min: 0.1, max: 3, step: 0.05 },
+      { key: 'walkSpeed',     label: 'Walk speed',         min: 0.5, max: 3, step: 0.05 },
+    ],
+    explainer: `
+      <h2>The Kirby Jump</h2>
+      <p>The fourth answer to variable height: <i>why land at all?</i> A
+      floaty ~3.5-tile jump — then press jump again in mid-air and Kirby
+      puffs up. Every press flaps upward, and while puffed he parachutes
+      down at a fraction of normal fall speed. Forever.</p>
+      <p class="rule"><b>The twist: flight as forgiveness.</b> Missed the
+      ledge? Flap. Documented quirk: releasing A halts Kirby's movement for
+      one frame. Ground speeds are the real 332/460 subpixels per frame;
+      hold <kbd>Shift</kbd> to run.</p>`,
+    pseudocode:
+`<span class="hl">if (airborne && jumpPressed)
+      puffed = true, yVelocity = flap</span>
+y += yVelocity
+if (puffed)
+      yVelocity -= 0.05  <span class="hl">// max fall 0.75</span>
+else  yVelocity -= 0.140625`,
+  },
 };
 
-const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx'];
+const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx', 'kirby'];
 
 /* ---- modern game-feel assists (toggleable, applied to every character) ---- */
 const COYOTE_FRAMES = 6;   // grace window after walking off a ledge
@@ -343,6 +384,11 @@ const SPRITE_DEFS = {
     run1: 'mmx_run1', run2: 'mmx_run2', run3: 'mmx_run3', run4: 'mmx_run4',
     run5: 'mmx_run5', run6: 'mmx_run6', run7: 'mmx_run7', run8: 'mmx_run8',
     jump: 'mmx_jump', fall: 'mmx_fall', dash: 'mmx_dash' } },
+  kirby: { facesLeft: true, frames: {
+    idle: 'kirby_idle', walk1: 'kirby_walk1', walk2: 'kirby_walk2',
+    walk3: 'kirby_walk3', jump: 'kirby_jump', fall: 'kirby_fall',
+    puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
+    puff4: 'kirby_puff4' } },
   sonic: { facesLeft: false, frames: {
     idle: 'sonic_idle',
     walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
@@ -426,13 +472,15 @@ FALLBACK_MAPS.megaman = FALLBACK_MAPS.mario;
 FALLBACK_PALETTES.megaman = { r: '#1e78c8', h: '#0a3f8c', s: '#f8d8b0', b: '#40b8f0', y: '#f8d820' };
 FALLBACK_MAPS.megamanx = FALLBACK_MAPS.mario;
 FALLBACK_PALETTES.megamanx = { r: '#00a0a8', h: '#005060', s: '#f8d8b0', b: '#70d8e0', y: '#f8d820' };
+FALLBACK_MAPS.kirby = FALLBACK_MAPS.sonic;           // round silhouette
+FALLBACK_PALETTES.kirby = { b: '#e888b8', s: '#f8c8d8', r: '#d04870', w: '#ffffff', k: '#101010' };
 
 /* frameKey → fallback pixel map, per character */
 function fallbackMapFor(charKey, frameKey) {
   const maps = FALLBACK_MAPS[charKey];
   if (maps[frameKey]) return maps[frameKey];
   const n = +frameKey.replace(/\D/g, '') || 1;
-  if (/^ball/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
+  if (/^(ball|puff)/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
   if (/jump|fall|spin/.test(frameKey)) return maps.jump || maps.idle;
   if (/^(walk|frun|run)/.test(frameKey)) return n % 2 ? maps.run1 : maps.run2;
   return maps.idle;
@@ -493,7 +541,7 @@ function newPlayerState(x) {
   return { x, y: GROUND, vx: 0, vy: 0, grounded: true, facing: 1,
            jumping: false, holdG: 0.125, fallG: 0.4375, pMeter: 0, dash: 0,
            sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
-           takeoffX: x, takeoffY: GROUND };
+           floating: false, freeze: 0, takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -537,6 +585,9 @@ function stepPhysics(st, charKey, P, input) {
       if (charKey === 'metroid') st.spinJump = Math.abs(st.vx) > 0.2;
     }
     st.grounded = false; st.jumping = true; ev.jumped = true;
+  } else if (charKey === 'kirby' && input.jumpPressed && !st.grounded) {
+    st.floating = true;                  /* puff up — every press is a flap */
+    st.vy = -P.flapImpulse;
   } else if (ASSISTS.buffer && input.jumpPressed && !st.grounded) {
     st.jumpBuffer = BUFFER_FRAMES;       /* remember the early press */
   }
@@ -549,6 +600,13 @@ function stepPhysics(st, charKey, P, input) {
   if ((charKey === 'metroid' || charKey === 'megaman' || charKey === 'megamanx') &&
       st.jumping && !input.jumpHeld && st.vy < 0)
     st.vy = 0;
+
+  /* Kirby's jump cut, plus the documented one-frame halt on releasing A */
+  if (charKey === 'kirby' && st.jumping && !st.floating &&
+      !input.jumpHeld && st.vy < -P.releaseCap) {
+    st.vy = -P.releaseCap;
+    st.freeze = 1;
+  }
 
   /* horizontal control */
   if (charKey === 'castlevania') {
@@ -632,6 +690,14 @@ function stepPhysics(st, charKey, P, input) {
     } else if (st.grounded && st.vx !== 0) {
       st.vx = Math.abs(st.vx) <= P.accel ? 0 : st.vx - Math.sign(st.vx) * P.accel;
     }
+  } else if (charKey === 'kirby') {
+    if (st.freeze > 0) {
+      st.freeze--; st.vx = 0;            /* one-frame halt after releasing A */
+    } else {
+      const cap = (!st.grounded && st.floating) ? P.floatSpeed
+                : (input.run ? P.runSpeed : P.walkSpeed);
+      st.vx = input.dir * cap;
+    }
   } else if (charKey === 'megaman') {
     /* purely digital: full speed or nothing, ground and air alike */
     st.vx = input.dir * P.walkSpeed;
@@ -691,6 +757,7 @@ function stepPhysics(st, charKey, P, input) {
 
     const prevY = st.y;
     st.y += st.vy;
+    if (st.y - hh < 0) { st.y = hh; if (st.vy < 0) st.vy = 0; }  /* world ceiling */
     let onGround = false;
     if (st.vy >= 0) {
       if (st.y >= GROUND) { st.y = GROUND; onGround = true; }
@@ -711,7 +778,7 @@ function stepPhysics(st, charKey, P, input) {
 
     if (onGround) {
       if (!st.grounded) ev.landed = true;
-      st.grounded = true; st.vy = 0; st.jumping = false;
+      st.grounded = true; st.vy = 0; st.jumping = false; st.floating = false;
     } else if (st.grounded) {
       st.grounded = false;               /* walked off a ledge */
       st.coyoteTimer = COYOTE_FRAMES;
@@ -723,6 +790,9 @@ function stepPhysics(st, charKey, P, input) {
     if (charKey === 'mario' || charKey === 'smw') {
       st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
       if (st.vy > P.terminal) st.vy = P.terminal;
+    } else if (charKey === 'kirby' && st.floating) {
+      st.vy += P.floatGravity;           /* puffed: parachute drift */
+      if (st.vy > P.floatTerminal) st.vy = P.floatTerminal;
     } else if (charKey !== 'sonic') {   /* plain gravity + terminal cap */
       st.vy += P.gravity;
       if (st.vy > P.terminal) st.vy = P.terminal;
@@ -772,7 +842,7 @@ let jumpQueued = false;
 /* ---- auto demo: run, full-hold jump, admire the stats, next character ---- */
 
 const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170,
-                      metroid: 165, megaman: 180, megamanx: 165 };
+                      metroid: 165, megaman: 180, megamanx: 165, kirby: 170 };
 const demo = { phase: 'off', timer: 0 };
 
 function startDemo() {
@@ -793,12 +863,18 @@ function demoInput() {
     case 'run':
       if (player.grounded && player.x >= DEMO_JUMP_X[charKey]) {
         demo.phase = 'air';
+        demo.timer = 0;
         return { ...move, jumpHeld: true, jumpPressed: true };
       }
       return move;
-    case 'air':
+    case 'air': {
       if (player.grounded) { demo.phase = 'admire'; demo.timer = 100; return idle; }
-      return { ...move, jumpHeld: true };
+      demo.timer++;
+      /* Kirby's showcase: flap a few times whenever the fall picks up speed */
+      const flap = charKey === 'kirby' && demo.timer > 15 && demo.timer < 130 &&
+                   player.vy > 0.6;
+      return { ...move, jumpHeld: true, jumpPressed: flap };
+    }
     case 'admire':
       if (--demo.timer <= 0)
         selectChar(CHAR_ORDER[(CHAR_ORDER.indexOf(charKey) + 1) % CHAR_ORDER.length]);
@@ -915,6 +991,7 @@ addEventListener('keydown', e => {
   if (e.key === '5') selectChar('metroid');
   if (e.key === '6') selectChar('megaman');
   if (e.key === '7') selectChar('megamanx');
+  if (e.key === '8') selectChar('kirby');
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -1055,6 +1132,10 @@ function spriteFrameKey() {
     }
     if (charKey === 'megaman') return 'jump';       // one air pose, rise & fall
     if (charKey === 'megamanx') return player.vy < 0 ? 'jump' : 'fall';
+    if (charKey === 'kirby') {
+      if (player.floating) return 'puff' + ((Math.floor(animClock / 5) % 4) + 1);
+      return player.vy < 0 ? 'jump' : 'fall';
+    }
     return player.jumping ? 'jump' : 'idle';
   }
   if (speed > 0.05) {
@@ -1064,6 +1145,10 @@ function spriteFrameKey() {
     }
     if (charKey === 'megaman')
       return 'run' + ((Math.floor(animClock / 6) % 3) + 1);
+    if (charKey === 'kirby') {
+      const d = Math.max(3, Math.round(8 - speed * 2));
+      return 'walk' + ((Math.floor(animClock / d) % 3) + 1);
+    }
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05) return 'dash';
       return 'run' + ((Math.floor(animClock / 4) % 8) + 1);

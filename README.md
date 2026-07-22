@@ -62,6 +62,10 @@ what the original games do) — and differ in what happens around the button:
   (5.0 force, 0.25 gravity) plus the dash — hold run for 3.5 px/f, and a
   dash-jump keeps that speed for the whole arc. Same height, 2.3× the
   distance.
+- **Kirby's Adventure (Kirby)** — the fourth answer to variable height: why
+  land at all? A floaty jump, then press jump mid-air to puff up — every
+  press flaps upward, and while puffed Kirby parachutes down at a fraction
+  of normal fall speed, indefinitely. Flight as forgiveness.
 
 ## Game-feel assists
 
@@ -124,6 +128,12 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   walk 1.5, dash 3.5, jump 5.0, gravity 0.25, terminal 5.75 px/f.
   *Approximated:* the dash is modeled as hold-to-dash rather than the real
   timed burst, and wall slides/kicks are not implemented.
+- **Kirby's Adventure** ([TASVideos resources](https://tasvideos.org/GameResources/NES/KirbysAdventure)):
+  walk 332 and run 460 subpx/frame (1.296875 / 1.796875 px/f), and the
+  documented quirk that releasing A halts movement for one frame, are
+  sourced. *Approximated (feel-fitted):* jump force 4.0, gravity 0.140625,
+  release cut, flap impulse, and the float's 0.05 gravity / 0.75 fall cap —
+  Kirby's vertical constants aren't publicly documented.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
@@ -145,10 +155,11 @@ Frames were sliced (scripts in `tools/`) from sheets on
 (SMB, NES) ripped by SuperJustinBros; Simon Belmont (Castlevania, NES) and
 Mega Man (Mega Man 2, NES) by Mister Mike; Sonic (Sonic the Hedgehog,
 Genesis) by Triangly; Samus Aran (Super Metroid, SNES) uploaded by "Barack
-Obama"; X (Mega Man X, SNES) by Random Talking Bush. The Super Mario World
-small-Mario frames come from
-[Mario Universe](https://www.mariouniverse.com/sprites-snes-smw/).
-Metroid and Super Mario World are © Nintendo; Mega Man is © Capcom. If `assets/`
+Obama"; X (Mega Man X, SNES) by Random Talking Bush; Kirby (Kirby's
+Adventure, NES) by Jermungandr. The Super Mario World small-Mario frames
+come from [Mario Universe](https://www.mariouniverse.com/sprites-snes-smw/).
+Metroid, Super Mario World, and Kirby are © Nintendo (Kirby with HAL
+Laboratory); Mega Man is © Capcom. If `assets/`
 is removed, the app automatically falls back to built-in placeholder pixel
 art, so the sample keeps running either way.
 
