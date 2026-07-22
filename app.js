@@ -914,6 +914,39 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { for (const k in keys) keys[k] = false; jumpQueued = false; }
 });
 
+/* ---- touch controls (CSS reveals them on coarse-pointer / touch devices) */
+document.addEventListener('touchstart', () => {
+  document.documentElement.classList.add('touch');
+}, { once: true, passive: true });
+
+function bindTouchButton(id, onDown, onUp) {
+  const btn = document.getElementById(id);
+  const down = e => {
+    e.preventDefault();
+    btn.classList.add('held');
+    const demo = el('toggle-demo');                 /* manual input takes over */
+    if (demo && demo.checked) { demo.checked = false; stopDemo(); }
+    onDown();
+  };
+  const up = e => {
+    if (e && e.cancelable) e.preventDefault();
+    btn.classList.remove('held');
+    onUp();
+  };
+  btn.addEventListener('touchstart', down, { passive: false });
+  btn.addEventListener('touchend', up, { passive: false });
+  btn.addEventListener('touchcancel', up, { passive: false });
+  btn.addEventListener('mousedown', down);
+  btn.addEventListener('mouseup', up);
+  btn.addEventListener('mouseleave', () => up());
+}
+
+bindTouchButton('tc-left',  () => { keys['arrowleft'] = true; },  () => { keys['arrowleft'] = false; });
+bindTouchButton('tc-right', () => { keys['arrowright'] = true; }, () => { keys['arrowright'] = false; });
+bindTouchButton('tc-run',   () => { keys['shift'] = true; },      () => { keys['shift'] = false; });
+bindTouchButton('tc-jump',  () => { keys[' '] = true; jumpQueued = true; },
+                            () => { keys[' '] = false; });
+
 function readInput() {
   const left = keys['arrowleft'] || keys['a'];
   const right = keys['arrowright'] || keys['d'];

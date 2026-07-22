@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Basics of Jumping — Interactive</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <header>
@@ -40,6 +40,16 @@
     <div class="canvas-wrap">
       <canvas id="game" width="1152" height="576"></canvas>
       <div class="slowmo-badge" id="slowmo-badge">SLOW-MO ¼×</div>
+      <div class="touch-controls" id="touch-controls">
+        <div class="tc-group">
+          <button class="tc-btn" id="tc-left" aria-label="move left">◀</button>
+          <button class="tc-btn" id="tc-right" aria-label="move right">▶</button>
+        </div>
+        <div class="tc-group">
+          <button class="tc-btn tc-run" id="tc-run" aria-label="run / dash">RUN</button>
+          <button class="tc-btn tc-jump" id="tc-jump" aria-label="jump">A</button>
+        </div>
+      </div>
     </div>
 
     <div class="stats-bar" id="stats-bar">
@@ -81,6 +91,6 @@
   </aside>
 </main>
 
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

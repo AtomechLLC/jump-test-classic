@@ -52,7 +52,14 @@ h1 {
 .discord-link:hover { text-decoration: underline; }
 
 /* ---- character tabs ---- */
-.char-tabs { display: flex; gap: 8px; }
+.char-tabs {
+  display: flex;
+  gap: 8px;
+  min-width: 0;             /* allow shrinking below content width */
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
 .char-tab {
   font-family: inherit;
   font-size: 16px;
@@ -228,8 +235,69 @@ kbd {
 }
 .view-toggles input { accent-color: var(--accent); }
 
+/* ---- touch controls (coarse pointers / touch devices only) ---- */
+.touch-controls {
+  position: absolute;
+  left: 0; right: 0; bottom: 8px;
+  display: none;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 10px;
+  pointer-events: none;
+}
+.tc-group { display: flex; gap: 10px; align-items: flex-end; }
+.tc-btn {
+  pointer-events: auto;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.65);
+  background: rgba(43, 32, 25, 0.38);
+  color: #fff;
+  font-family: inherit;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tc-btn.held { background: rgba(181, 67, 42, 0.7); }
+.tc-run { width: 46px; height: 46px; font-size: 11px; letter-spacing: 1px; }
+.tc-jump { width: 70px; height: 70px; font-size: 26px; font-weight: bold;
+           background: rgba(181, 67, 42, 0.45); }
+
+@media (pointer: coarse) {
+  .touch-controls { display: flex; }
+  .controls-hint { display: none; }
+}
+.touch .touch-controls { display: flex; }
+.touch .controls-hint { display: none; }
+
+/* ---- small screens ---- */
 @media (max-width: 980px) {
+  header { flex-direction: column; align-items: stretch; gap: 8px; }
+  .char-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; }
+  .char-tab { flex: 0 0 auto; white-space: nowrap; }
   .stage-col { min-width: 100%; }
   .side-col { min-width: 100%; flex-direction: row; flex-wrap: wrap; }
   .side-col > * { flex: 1 1 280px; }
+}
+
+@media (max-width: 640px) {
+  header { padding: 10px 12px 0; }
+  h1 { font-size: 21px; }
+  .subtitle { font-size: 13px; }
+  .credit { font-size: 11px; }
+  main { padding: 10px 10px 24px; gap: 12px; }
+  .stage-col { min-width: 0; }
+  .char-tab { font-size: 12px; padding: 6px 9px 5px; gap: 5px; }
+  .phase-cards { gap: 6px; margin-bottom: 8px; }
+  .phase-card { padding: 6px 8px; }
+  .phase-card h3 { font-size: 12px; margin: 0; }
+  .phase-card p { display: none; }
+  .stats-bar { font-size: 12px; gap: 12px; }
+  .explainer { font-size: 13px; }
+  .tc-btn { width: 50px; height: 50px; }
+  .tc-jump { width: 62px; height: 62px; }
 }
