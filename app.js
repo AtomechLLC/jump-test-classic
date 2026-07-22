@@ -443,7 +443,8 @@ const SPRITE_DEFS = {
     puff4: 'kirby_puff4' } },
   ori: { facesLeft: false, frames: {
     idle: 'ori_idle', run1: 'ori_run1', run2: 'ori_run2',
-    jump: 'ori_jump', fall: 'ori_fall', flip: 'ori_flip' } },
+    skip: 'ori_skip', hop: 'ori_hop', flip: 'ori_flip',
+    fall: 'ori_fall' } },
   sonic: { facesLeft: false, frames: {
     idle: 'sonic_idle',
     walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
@@ -574,7 +575,7 @@ function fallbackMapFor(charKey, frameKey) {
   if (maps[frameKey]) return maps[frameKey];
   const n = +frameKey.replace(/\D/g, '') || 1;
   if (/^(ball|puff|tumble)/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
-  if (/jump|fall|spin|flip/.test(frameKey)) return maps.jump || maps.idle;
+  if (/jump|fall|spin|flip|skip|hop/.test(frameKey)) return maps.jump || maps.idle;
   if (/^(walk|frun|run)/.test(frameKey)) return n % 2 ? maps.run1 : maps.run2;
   return maps.idle;
 }
@@ -641,7 +642,7 @@ function newPlayerState(x) {
            sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
            floating: false, freeze: 0, tumble: 0, flapAnim: 0,
            jumpsUsed: 0, airFlip: 0, chainStage: 0, chainTimer: 0,
-           takeoffX: x, takeoffY: GROUND };
+           lastChainStage: 0, takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -693,6 +694,7 @@ function stepPhysics(st, charKey, P, input) {
         /* the ground chain: skip, hop, flip — heights 3 / 3.75 / 4.5 */
         const stage = st.chainTimer > 0 ? Math.min(2, st.chainStage) : 0;
         st.vy = -P.jumpForce * Math.sqrt(C.chainRatios[stage]);
+        st.lastChainStage = stage;                     /* skip / hop / flip pose */
         if (stage === 2) st.airFlip = 18;              /* the flip */
         st.chainStage = stage === 2 ? 0 : stage + 1;
         st.jumpsUsed = 1; st.holdG = P.holdGravity; st.fallG = P.releaseGravity;
@@ -1297,8 +1299,10 @@ function spriteFrameKey() {
     if (charKey === 'megaman') return 'jump';       // one air pose, rise & fall
     if (charKey === 'megamanx') return player.vy < 0 ? 'jump' : 'fall';
     if (charKey === 'ori') {
-      if (player.airFlip > 0) return 'flip';        // somersault on air jumps
-      return player.vy < 0 ? 'jump' : 'fall';
+      if (player.airFlip > 0) return 'flip';        // third jump / air jump
+      if (player.vy < 0)
+        return ['skip', 'hop', 'flip'][player.lastChainStage || 0];
+      return 'fall';
     }
     if (charKey === 'kirby') {
       if (player.floating) {
