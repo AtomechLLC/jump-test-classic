@@ -75,20 +75,18 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
 
 ## Sprite credits
 
-The original in-game sprites are **not included in this repository** — they
-are copyrighted assets (characters © Nintendo, Konami, and SEGA), and the
-sheets' rippers ask that they only be hosted at their source sites. Without
-an `assets/` folder the app automatically falls back to built-in placeholder
-pixel art, so a fresh clone runs fine.
+`assets/` contains individual frames from the original games, included here
+solely for non-commercial, educational demonstration of jump physics. The
+characters and their sprites are © Nintendo (Mario), © Konami (Simon
+Belmont), and © SEGA (Sonic); they will be removed immediately at the
+request of any rights holder.
 
-To use the real sprites locally, download the sheets for personal/educational
-use from [The Spriters Resource](https://www.spriters-resource.com/) —
-Mario & Luigi (SMB, NES) by SuperJustinBros, Simon Belmont (Castlevania, NES)
-by Mister Mike, Sonic (Sonic the Hedgehog, Genesis) by Triangly — and slice
-frames into `assets/` (git-ignored) using the segmentation scripts in
-`tools/`. Expected filenames (see `SPRITE_DEFS` in `app.js`):
-`mario_idle/run1-3/jump`, `simon_idle/run1-3/jump`, `sonic_idle`,
-`sonic_walk1-6`, `sonic_run1-4`, `sonic_ball1-4` (all `.png`).
+Frames were sliced (scripts in `tools/`) from sheets on
+[The Spriters Resource](https://www.spriters-resource.com/): Mario & Luigi
+(SMB, NES) ripped by SuperJustinBros; Simon Belmont (Castlevania, NES) by
+Mister Mike; Sonic (Sonic the Hedgehog, Genesis) by Triangly. If `assets/`
+is removed, the app automatically falls back to built-in placeholder pixel
+art, so the sample keeps running either way.
 
 ## What the visualization shows
 
