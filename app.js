@@ -393,7 +393,9 @@ function stepPhysics(st, charKey, P, input) {
         st.vx = 0;
       }
     }
-    st.x = Math.max(hw + 2, Math.min(W - hw - 2, st.x));
+    /* no walls — wrap around the screen */
+    if (st.x >= W) st.x -= W;
+    else if (st.x < 0) st.x += W;
 
     const prevY = st.y;
     st.y += st.vy;
@@ -651,7 +653,9 @@ function tick() {
     const apex = jumpStart.y - Math.min(...lastArc.map(p => p.y));
     el('stat-apex').textContent = `${apex.toFixed(0)} px · ${(apex / TILE).toFixed(1)} tiles`;
     el('stat-air').textContent = `${airFrames} frames · ${(airFrames / 60).toFixed(2)} s`;
-    el('stat-range').textContent = `${Math.abs(player.x - jumpStart.x).toFixed(0)} px`;
+    let dx = player.x - jumpStart.x;               // account for screen wrap
+    if (dx > W / 2) dx -= W; else if (dx < -W / 2) dx += W;
+    el('stat-range').textContent = `${Math.abs(dx).toFixed(0)} px`;
   }
 
   if (takeoffFlash > 0) takeoffFlash--;
@@ -704,8 +708,13 @@ function drawArc(pts, color, width, dash) {
   ctx.lineCap = 'round';
   ctx.setLineDash(dash);
   ctx.beginPath();
-  ctx.moveTo(S(pts[0].x), S(pts[0].y - 1));
-  for (const p of pts) ctx.lineTo(S(p.x), S(p.y - 1));
+  let prev = null;
+  for (const p of pts) {
+    /* break the line where the path wraps around the screen edge */
+    if (!prev || Math.abs(p.x - prev.x) > W / 2) ctx.moveTo(S(p.x), S(p.y - 1));
+    else ctx.lineTo(S(p.x), S(p.y - 1));
+    prev = p;
+  }
   ctx.stroke();
   ctx.setLineDash([]);
 }
@@ -720,8 +729,13 @@ function drawSprite(frameKey, x, y, facing, alpha) {
     return;
   }
   ctx.globalAlpha = alpha;
-  ctx.drawImage(facing < 0 ? spr.left : spr.right,
-    S(x) - S(spr.w) / 2, S(y) - S(spr.h), S(spr.w), S(spr.h));
+  const img = facing < 0 ? spr.left : spr.right;
+  const draw = wx => ctx.drawImage(img,
+    S(wx) - S(spr.w) / 2, S(y) - S(spr.h), S(spr.w), S(spr.h));
+  draw(x);
+  /* wrap copies while crossing the screen edge */
+  if (x < spr.w) draw(x + W);
+  if (x > W - spr.w) draw(x - W);
   ctx.globalAlpha = 1;
 }
 
