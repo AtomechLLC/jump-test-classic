@@ -833,7 +833,12 @@ function buildTabs() {
       icon.getContext('2d').drawImage(spr.right, 0, 0);
       btn.append(icon);
     }
-    btn.append(document.createTextNode(c.game));
+    const label = document.createElement('span');
+    label.className = 'tab-label';
+    label.textContent = c.game;
+    btn.append(label);
+    btn.title = c.game;
+    btn.setAttribute('aria-label', c.game);
     btn.addEventListener('click', () => selectChar(key));
     nav.append(btn);
   }

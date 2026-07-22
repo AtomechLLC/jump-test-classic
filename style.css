@@ -133,6 +133,8 @@ h1 {
   gap: 8px;
 }
 .char-tab canvas { image-rendering: pixelated; }
+.char-tab .tab-label { display: none; }
+.char-tab.active .tab-label { display: inline; }
 .char-tab.active {
   background: #fff;
   color: var(--ink);
