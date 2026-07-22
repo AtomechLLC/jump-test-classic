@@ -41,6 +41,11 @@ what the original games do) — and differ in what happens around the button:
   weak gravity while the button is held and Mario is rising, ~3.5× once
   released (or past the peak). The jump table is speed-indexed (see accuracy
   notes). Hold Shift to run. Full air control.
+- **Super Mario World (Mario)** — the SNES refinement: the gravity switch
+  stays (release exactly doubles gravity), but the initial jump force itself
+  scales with ground speed. Filling the P-meter (hold run at speed) unlocks
+  the 3.06 px/f sprint and the full 6-tile jump. Distinct rising and falling
+  sprites.
 - **Sonic the Hedgehog (Sonic)** — variable height by *cutting velocity*:
   release while rising faster than 4 px/frame and upward speed snaps to 4.
   Momentum-heavy ground movement (accel 0.046875, top speed 6) stretches the
@@ -67,6 +72,15 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   air drag `xsp -= trunc(xsp/0.125)/256` when −4 < ysp < 0 (after gravity),
   no fall-speed cap, and the Sonic 1 quirk that the player doesn't move on
   the frame the jump starts.
+- **Super Mario World** ([SMW Central measurements](https://www.smwcentral.net/?p=viewthread&t=97883)):
+  max X speeds 21/37/49 subpx (walk/run/P-speed = 1.3125/2.3125/3.0625 px/f);
+  initial jump speeds 77/82/87/92 subpx (4.8125→5.75 px/f) by speed tier,
+  interpolated between anchors here. Gravity 3 subpx held-and-rising /
+  6 subpx otherwise (0.1875/0.375) — cross-checked against the documented
+  jump heights (6 tiles at sprint "only just barely", 5 at run, 2 minimum),
+  which these values reproduce. *Approximated:* P-meter fill timing (~80
+  frames from standstill is documented; the meter model here is simplified),
+  skid rate, the 0-1-0-1-2 speed oscillation quirk, and the fall-speed cap.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
@@ -85,8 +99,9 @@ request of any rights holder.
 
 Frames were sliced (scripts in `tools/`) from sheets on
 [The Spriters Resource](https://www.spriters-resource.com/): Mario & Luigi
-(SMB, NES) ripped by SuperJustinBros; Simon Belmont (Castlevania, NES) by
-Mister Mike; Sonic (Sonic the Hedgehog, Genesis) by Triangly. If `assets/`
+(SMB, NES) ripped by SuperJustinBros; Mario (Super Mario World, SNES) by
+Mister Man; Simon Belmont (Castlevania, NES) by Mister Mike; Sonic (Sonic
+the Hedgehog, Genesis) by Triangly. If `assets/`
 is removed, the app automatically falls back to built-in placeholder pixel
 art, so the sample keeps running either way.
 

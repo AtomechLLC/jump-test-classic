@@ -108,6 +108,49 @@ yVelocity -= gravity
 else  yVelocity -= releaseGravity // ~3.5×</span>`,
   },
 
+  smw: {
+    name: 'Mario', game: 'Super Mario World', accent: '#2f9648',
+    hitboxW: 12,
+    defaults: {
+      accel: 0.09375,         // ±1/±2 subpx alternating ≈ 1.5 subpx/frame²
+      releaseDecel: 0.0625,   // 1 subpx
+      skidDecel: 0.125,       // approximated — see README
+      maxWalk: 1.3125,        // 21 subpx/frame
+      maxRun: 2.3125,         // 37 subpx/frame
+      maxSprint: 3.0625,      // 49 subpx/frame — P-speed
+      pMeterFull: 56,         // ≈80 frames standstill → maxed meter, minus accel time
+      jumpForce: 4.8125,      // 77 subpx standing; scales to 92 at P-speed
+      holdGravity: 0.1875,    // 3 subpx — reproduces the documented 6/5/2-tile heights
+      releaseGravity: 0.375,  // 6 subpx — release exactly doubles gravity
+      terminal: 4.0,
+    },
+    sliders: [
+      { key: 'jumpForce',      label: 'Jump force (standing)', min: 2, max: 8, step: 0.0625 },
+      { key: 'holdGravity',    label: 'Gravity (button held)', min: 0.03, max: 0.6, step: 0.005 },
+      { key: 'releaseGravity', label: 'Gravity (released)',    min: 0.03, max: 1.0, step: 0.005 },
+      { key: 'maxSprint',      label: 'P-speed (sprint)',      min: 1, max: 5, step: 0.0625 },
+      { key: 'accel',          label: 'Acceleration',          min: 0.02, max: 0.3, step: 0.005 },
+    ],
+    explainer: `
+      <h2>The Super Mario World Jump</h2>
+      <p>The SNES refinement: the gravity switch stays (0.1875 held &amp;
+      rising, 0.375 released — release exactly <i>doubles</i> gravity, gentler
+      than SMB1's ~3.5×), but now the initial jump force itself scales with
+      ground speed — 77 subpixels standing, 82 at walk, 87 at run, 92 at full
+      P-speed.</p>
+      <p class="rule"><b>The twist: speed <i>is</i> height.</b> Hold
+      <kbd>Shift</kbd> at run speed for ~1&nbsp;second to fill the P-meter and
+      unlock the 3.06 px/f sprint — the only way to reach the full 6-tile
+      jump (and even then, only just barely).</p>`,
+    pseudocode:
+`<span class="hl">// takeoff: force scales with speed
+jumpForce = table[ |xVelocity| ]  // 77…92</span>
+y         += yVelocity
+if (rising && jumpHeld)
+      yVelocity -= 0.1875
+else  yVelocity -= 0.375  <span class="hl">// exactly 2×</span>`,
+  },
+
   sonic: {
     name: 'Sonic', game: 'Sonic the Hedgehog', accent: '#2456e0',
     hitboxW: 14,
@@ -139,7 +182,23 @@ yVelocity -= gravity
   },
 };
 
-const CHAR_ORDER = ['castlevania', 'mario', 'sonic'];
+const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic'];
+
+/* SMW jump force scales with |vx|: 77/82/87/92 subpx at standstill /
+   walk max (21) / run max (37) / sprint max (49) — interpolated between. */
+function smwJumpForce(P, vxAbs) {
+  const anchors = [[0, 77], [21, 82], [37, 87], [49, 92]];
+  const s = Math.min(vxAbs * 16, 49);
+  let subpx = 92;
+  for (let i = 1; i < anchors.length; i++) {
+    if (s <= anchors[i][0]) {
+      const [s0, j0] = anchors[i - 1], [s1, j1] = anchors[i];
+      subpx = j0 + (j1 - j0) * (s - s0) / (s1 - s0);
+      break;
+    }
+  }
+  return (subpx / 16) * (P.jumpForce / 4.8125);
+}
 
 /* ----------------------------------------------------------------- sprites
    Frames sliced from sheets on The Spriters Resource (see README credits).
@@ -152,6 +211,10 @@ const SPRITE_DEFS = {
   mario: { facesLeft: false, frames: {
     idle: 'mario_idle', run1: 'mario_run1', run2: 'mario_run2',
     run3: 'mario_run3', jump: 'mario_jump' } },
+  smw: { facesLeft: false, frames: {
+    idle: 'smw_idle', walk1: 'smw_walk1', walk2: 'smw_walk2',
+    run1: 'smw_run1', run2: 'smw_run2',
+    jump: 'smw_jump', fall: 'smw_fall', runjump: 'smw_runjump' } },
   sonic: { facesLeft: false, frames: {
     idle: 'sonic_idle',
     walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
@@ -227,12 +290,16 @@ const FALLBACK_MAPS = {
   },
 };
 
+FALLBACK_MAPS.smw = FALLBACK_MAPS.mario;        // same silhouette works fine
+FALLBACK_PALETTES.smw = FALLBACK_PALETTES.mario;
+
 /* frameKey → fallback pixel map, per character */
 function fallbackMapFor(charKey, frameKey) {
   const maps = FALLBACK_MAPS[charKey];
   if (maps[frameKey]) return maps[frameKey];
   const n = +frameKey.replace(/\D/g, '') || 1;
   if (/^ball/.test(frameKey)) return n % 2 ? maps.ball1 : maps.ball2;
+  if (/jump|fall/.test(frameKey)) return maps.jump || maps.idle;
   if (/^(walk|frun|run)/.test(frameKey)) return n % 2 ? maps.run1 : maps.run2;
   return maps.idle;
 }
@@ -290,8 +357,8 @@ function loadSprites() {
 
 function newPlayerState(x) {
   return { x, y: GROUND, vx: 0, vy: 0, grounded: true, facing: 1,
-           jumping: false, holdG: 0.125, fallG: 0.4375,
-           takeoffX: x, takeoffY: GROUND };
+           jumping: false, holdG: 0.125, fallG: 0.4375, pMeter: 0,
+           sprintJump: false, takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -315,6 +382,11 @@ function stepPhysics(st, charKey, P, input) {
       st.vy = -t.vy * (P.jumpForce / 4.0);
       st.holdG = t.hold * (P.holdGravity / 0.125);
       st.fallG = t.fall * (P.releaseGravity / 0.4375);
+    } else if (charKey === 'smw') {
+      st.vy = -smwJumpForce(P, Math.abs(st.vx));
+      st.holdG = P.holdGravity;
+      st.fallG = P.releaseGravity;
+      st.sprintJump = Math.abs(st.vx) >= P.maxRun + 0.05;
     } else {
       st.vy = -P.jumpForce;
     }
@@ -358,6 +430,33 @@ function stepPhysics(st, charKey, P, input) {
       const d = P.releaseDecel;
       st.vx = Math.abs(st.vx) <= d ? 0 : st.vx - Math.sign(st.vx) * d;
     }
+  } else if (charKey === 'smw') {
+    /* P-meter: fills while grounded at run max with run held; holds in air */
+    if (st.grounded) {
+      if (input.run && input.dir !== 0 && Math.abs(st.vx) >= P.maxRun - 0.01)
+        st.pMeter = Math.min(P.pMeterFull, st.pMeter + 1);
+      else st.pMeter = Math.max(0, st.pMeter - 2);
+    }
+    if (input.dir !== 0) {
+      const turning = st.vx !== 0 && Math.sign(st.vx) !== input.dir;
+      if (turning) {
+        st.vx += input.dir * (st.grounded ? P.skidDecel : P.accel);
+      } else {
+        const cap = input.run
+          ? (st.pMeter >= P.pMeterFull ? P.maxSprint : P.maxRun)
+          : P.maxWalk;
+        if (st.grounded && Math.abs(st.vx) > cap) {
+          st.vx = Math.sign(st.vx) * Math.max(cap, Math.abs(st.vx) - P.releaseDecel);
+        } else {
+          st.vx += input.dir * P.accel;
+          const hardCap = st.grounded ? cap : P.maxSprint;
+          if (Math.abs(st.vx) > hardCap) st.vx = Math.sign(st.vx) * hardCap;
+        }
+      }
+    } else if (st.grounded && st.vx !== 0) {
+      const d = P.releaseDecel;
+      st.vx = Math.abs(st.vx) <= d ? 0 : st.vx - Math.sign(st.vx) * d;
+    }
   } else { /* sonic */
     if (input.dir !== 0) {
       if (st.grounded && st.vx !== 0 && Math.sign(st.vx) !== input.dir) {
@@ -373,11 +472,14 @@ function stepPhysics(st, charKey, P, input) {
   }
   if (input.dir !== 0 && (st.grounded || charKey !== 'castlevania')) st.facing = input.dir;
 
-  /* Mario: refresh gravity tier while grounded (for walking off ledges) */
+  /* refresh gravity selection while grounded (for walking off ledges) */
   if (charKey === 'mario' && st.grounded) {
     const t = C.tiers.find(t => Math.abs(st.vx) >= t.min);
     st.holdG = t.hold * (P.holdGravity / 0.125);
     st.fallG = t.fall * (P.releaseGravity / 0.4375);
+  } else if (charKey === 'smw' && st.grounded) {
+    st.holdG = P.holdGravity;
+    st.fallG = P.releaseGravity;
   }
 
   /* movement + collision. Sonic 1 quirk: jumping exits the movement cycle,
@@ -427,7 +529,7 @@ function stepPhysics(st, charKey, P, input) {
 
   /* gravity — applied AFTER the position update, like the diagram says */
   if (!st.grounded && !skipMove) {
-    if (charKey === 'mario') {
+    if (charKey === 'mario' || charKey === 'smw') {
       st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
       if (st.vy > P.terminal) st.vy = P.terminal;
     } else if (charKey === 'castlevania') {
@@ -477,7 +579,7 @@ let jumpQueued = false;
 
 /* ---- auto demo: run, full-hold jump, admire the stats, next character ---- */
 
-const DEMO_JUMP_X = { castlevania: 180, mario: 150, sonic: 170 };
+const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170 };
 const demo = { phase: 'off', timer: 0 };
 
 function startDemo() {
@@ -490,7 +592,7 @@ function stopDemo() { demo.phase = 'off'; }
 
 function demoInput() {
   const idle = { dir: 0, run: false, jumpHeld: false, jumpPressed: false };
-  const move = { dir: 1, run: charKey === 'mario', jumpHeld: false, jumpPressed: false };
+  const move = { dir: 1, run: charKey === 'mario' || charKey === 'smw', jumpHeld: false, jumpPressed: false };
   switch (demo.phase) {
     case 'wait':
       if (--demo.timer <= 0) demo.phase = 'run';
@@ -603,7 +705,8 @@ addEventListener('keydown', e => {
   if (e.key.toLowerCase() === 'r') { player = newPlayerState(70); arc = []; lastArc = []; ghosts = []; }
   if (e.key === '1') selectChar('castlevania');
   if (e.key === '2') selectChar('mario');
-  if (e.key === '3') selectChar('sonic');
+  if (e.key === '3') selectChar('smw');
+  if (e.key === '4') selectChar('sonic');
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -682,6 +785,8 @@ function spriteFrameKey() {
       const d = Math.max(1, Math.floor(4 - Math.min(speed, 3)));   // SPG spin timing
       return SONIC_BALL[Math.floor(animClock / d) % 4];
     }
+    if (charKey === 'smw')
+      return player.vy < 0 ? (player.sprintJump ? 'runjump' : 'jump') : 'fall';
     return player.jumping ? 'jump' : 'idle';
   }
   if (speed > 0.05) {
@@ -689,6 +794,11 @@ function spriteFrameKey() {
       const d = Math.max(1, Math.floor(8 - speed));                // SPG walk timing
       const cyc = speed >= 6 ? SONIC_RUN : SONIC_WALK;
       return cyc[Math.floor(animClock / d) % cyc.length];
+    }
+    if (charKey === 'smw') {
+      const d = Math.max(2, Math.round(9 - speed * 2));
+      const cyc = speed > 2.4 ? ['run1', 'run2'] : ['walk1', 'walk2'];
+      return cyc[Math.floor(animClock / d) % 2];
     }
     if (charKey === 'mario') {
       const d = Math.max(2, Math.round(10 - speed * 2.5));
