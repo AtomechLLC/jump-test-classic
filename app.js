@@ -318,8 +318,9 @@ yVelocity -= 0.25`,
       lives in the float: press jump mid-air to puff up, and flaps use a
       low impulse with a low capped fall speed. Forever.</p>
       <p class="rule"><b>The twist: flight as forgiveness.</b> Missed the
-      ledge? Flap. Ground movement is Super Star style: an instant walk and
-      a double-speed dash on <kbd>Shift</kbd>.</p>`,
+      ledge? Flap. Changed your mind? <kbd>Shift</kbd> spits the air out
+      and normal falling returns. Ground movement is Super Star style: an
+      instant walk and a double-speed dash on <kbd>Shift</kbd>.</p>`,
     pseudocode:
 `<span class="hl">if (airborne && jumpPressed)
       puffed = true, yVelocity = flap</span>
@@ -448,7 +449,9 @@ const SPRITE_DEFS = {
     tumble1: 'kirby_tumble1', tumble2: 'kirby_tumble2',
     tumble3: 'kirby_tumble3',
     puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
-    puff4: 'kirby_puff4' } },
+    puff4: 'kirby_puff4',
+    spit1: 'kirby_spit1', spit2: 'kirby_spit2',
+    airpuff: 'kirby_airpuff' } },
   /* Ori's frames ship at the game's native resolution and draw at 1:1
      screen pixels (scale = 1/SCALE), so no resampling ever happens. */
   ori: { facesLeft: false, scale: 1 / SCALE, frames: {
@@ -468,7 +471,7 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 8;         // bump when sprite files change, so caches can't
+const ASSET_V = 9;         // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -661,6 +664,7 @@ function newPlayerState(x) {
            floating: false, freeze: 0, tumble: 0, flapAnim: 0,
            jumpsUsed: 0, airFlip: 0, chainStage: 0, chainTimer: 0,
            lastChainStage: 0, sustain: 0, dashTime: 0, fallTime: 0,
+           runHeld: false, spitAnim: 0, spitFx: null,
            takeoffX: x, takeoffY: GROUND };
 }
 
@@ -749,6 +753,21 @@ function stepPhysics(st, charKey, P, input) {
 
   /* (Kirby has no jump cut — the first jump's height is fixed; variable
      height comes entirely from flaps and the float) */
+
+  /* Kirby's spit: press dash while floating → exhale the air (the puff
+     is the spat air bullet) and drop back to normal falling speeds */
+  if (charKey === 'kirby') {
+    const spit = st.floating && input.run && !st.runHeld;
+    st.runHeld = input.run;
+    if (spit) {
+      st.floating = false;
+      st.spitAnim = 12;
+      st.spitFx = { x: st.x + st.facing * 8, y: st.y - 14, dir: st.facing, t: 16 };
+    }
+    if (st.spitFx && --st.spitFx.t <= 0) st.spitFx = null;
+    else if (st.spitFx) st.spitFx.x += st.spitFx.dir * 2.5;
+    if (st.spitAnim > 0) st.spitAnim--;
+  }
 
   /* horizontal control */
   if (charKey === 'castlevania') {
@@ -1067,7 +1086,9 @@ function demoInput() {
       demo.timer++;
       const flap = charKey === 'kirby' && demo.flutterDone &&
                    demo.timer > 10 && demo.timer < 150 && player.vy > 0.4;
-      return { ...move, jumpHeld: true, jumpPressed: flap };
+      /* act three: spit the air out and drop like a stone */
+      const spit = charKey === 'kirby' && demo.flutterDone && demo.timer >= 165;
+      return { ...move, jumpHeld: true, jumpPressed: flap, run: spit };
     }
     case 'admire':
       if (--demo.timer <= 0) {
@@ -1342,6 +1363,8 @@ function spriteFrameKey() {
       return 'fall';
     }
     if (charKey === 'kirby') {
+      if (player.spitAnim > 0)           /* exhale: squeeze, then the spit */
+        return player.spitAnim > 6 ? 'spit1' : 'spit2';
       if (player.floating) {
         if (player.flapAnim > 0)         /* one flap cycle per press */
           return 'puff' + (Math.min(3, Math.floor((12 - player.flapAnim) / 3)) + 1);
@@ -1525,6 +1548,11 @@ function render() {
     for (const g of ghosts) drawSprite(g.frame, g.x, g.y, g.facing, g.alpha);
 
   drawSprite(spriteFrameKey(), player.x, player.y, player.facing, 1);
+
+  /* Kirby's exhaled air bullet drifts off and fades */
+  if (player.spitFx)
+    drawSprite('airpuff', player.spitFx.x, player.spitFx.y + 3,
+               player.spitFx.dir, Math.min(1, player.spitFx.t / 8));
 
   /* assist labels float up and fade */
   ctx.font = 'italic 15px Georgia';
