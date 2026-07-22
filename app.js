@@ -441,7 +441,9 @@ const SPRITE_DEFS = {
     tumble3: 'kirby_tumble3',
     puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
     puff4: 'kirby_puff4' } },
-  ori: { facesLeft: false, frames: {
+  /* Ori's frames ship at the game's native resolution; `scale` maps them
+     to world pixels and the renderer downsamples smoothly at draw time. */
+  ori: { facesLeft: false, scale: 26 / 120, frames: {
     idle: 'ori_idle', run1: 'ori_run1', run2: 'ori_run2',
     skip: 'ori_skip', hop: 'ori_hop', flip: 'ori_flip',
     fall: 'ori_fall' } },
@@ -456,7 +458,7 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 4;         // bump when sprite files change, so caches can't
+const ASSET_V = 5;         // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -619,8 +621,14 @@ function loadSprites() {
             return c;
           };
           const a = make(false), b = make(true);
-          SPRITE_CACHE[charKey][frameKey] = def.facesLeft
-            ? { right: b, left: a, w, h } : { right: a, left: b, w, h };
+          const k = def.scale || 1;                 /* native-res art: world
+                                                       dims shrink, source
+                                                       stays full detail */
+          const entry = { w: Math.round(w * k), h: Math.round(h * k),
+                          smooth: !!def.scale };
+          if (def.facesLeft) { entry.right = b; entry.left = a; }
+          else { entry.right = a; entry.left = b; }
+          SPRITE_CACHE[charKey][frameKey] = entry;
           resolve();
         };
         img.onerror = () => {
@@ -1383,6 +1391,10 @@ function drawSprite(frameKey, x, y, facing, alpha) {
     return;
   }
   ctx.globalAlpha = alpha;
+  if (spr.smooth) {                    /* native-res art: downsample cleanly */
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+  }
   const img = facing < 0 ? spr.left : spr.right;
   const draw = wx => ctx.drawImage(img,
     S(wx) - S(spr.w) / 2, S(y) - S(spr.h), S(spr.w), S(spr.h));
@@ -1390,6 +1402,7 @@ function drawSprite(frameKey, x, y, facing, alpha) {
   /* wrap copies while crossing the screen edge */
   if (x < spr.w) draw(x + W);
   if (x > W - spr.w) draw(x - W);
+  ctx.imageSmoothingEnabled = false;
   ctx.globalAlpha = 1;
 }
 
