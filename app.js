@@ -293,11 +293,10 @@ yVelocity -= 0.25`,
     defaults: {
       walkSpeed: 1.25,       // Super Star movement, approximated
       runSpeed: 2.5,         // dash: roughly double walk speed
-      jumpForce: 5.0,        // high force + high rising gravity = upward burst
+      jumpForce: 6.0,        // high force + high rising gravity = upward burst
       riseGravity: 0.28125,  // higher gravity while ascending
       fallGravity: 0.09375,  // once Y velocity hits 0, lower gravity is used
       terminal: 2.5,         // Kirby never falls fast
-      releaseCap: 1.5,       // approximated jump cut
       flapImpulse: 2.0,      // float jumps: low initial force...
       floatGravity: 0.09375,
       floatTerminal: 0.75,   // ...and a low capped terminal velocity
@@ -315,9 +314,10 @@ yVelocity -= 0.25`,
       <p>Asymmetric gravity, per Celia Wagar's Kirby diagram: a really high
       initial force <i>and</i> really high gravity while ascending, so Kirby
       bursts upward — then once Y velocity hits 0, a much lower falling
-      gravity (with a slow fall cap) takes over. Press jump mid-air to puff
-      up: float jumps use a low initial force and a low capped terminal
-      velocity. Forever.</p>
+      gravity (with a slow fall cap) takes over. The first jump's height is
+      <i>fixed</i> — holding the button does nothing. Press jump mid-air to
+      puff up: float jumps use a low initial force and a low capped
+      terminal velocity. Forever.</p>
       <p class="rule"><b>The twist: flight as forgiveness.</b> Missed the
       ledge? Flap. Ground movement is Super Star style: an instant walk and
       a double-speed dash on <kbd>Shift</kbd>.</p>`,
@@ -435,9 +435,9 @@ const SPRITE_DEFS = {
     tumble3: 'kirby_tumble3',
     puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
     puff4: 'kirby_puff4' } },
-  ori: { facesLeft: false, inline: true, frames: {
-    idle: 'idle', run1: 'run1', run2: 'run2',
-    jump: 'jump', fall: 'fall', flip: 'flip' } },
+  ori: { facesLeft: true, frames: {
+    idle: 'ori_idle', run1: 'ori_run1', run2: 'ori_run2',
+    jump: 'ori_jump', fall: 'ori_fall', flip: 'ori_flip' } },
   sonic: { facesLeft: false, frames: {
     idle: 'sonic_idle',
     walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
@@ -449,7 +449,7 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 3;         // bump when sprite files change, so caches can't
+const ASSET_V = 4;         // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -703,10 +703,8 @@ function stepPhysics(st, charKey, P, input) {
       st.jumping && !input.jumpHeld && st.vy < 0)
     st.vy = 0;
 
-  /* Kirby's jump cut */
-  if (charKey === 'kirby' && st.jumping && !st.floating &&
-      !input.jumpHeld && st.vy < -P.releaseCap)
-    st.vy = -P.releaseCap;
+  /* (Kirby has no jump cut — the first jump's height is fixed; variable
+     height comes entirely from flaps and the float) */
 
   /* horizontal control */
   if (charKey === 'castlevania') {

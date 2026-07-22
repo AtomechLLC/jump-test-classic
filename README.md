@@ -140,17 +140,20 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   diagram:
   high initial force with high gravity while ascending (an upward burst),
   a much lower gravity once Y velocity reaches 0, and float jumps with a
-  low initial force under a low capped terminal velocity. *Approximated
-  (feel-fitted):* the specific constants (5.0 force, 0.28125 rise /
-  0.09375 fall gravity, 2.5 fall cap, 2.0 flap, 0.75 float cap) — exact
-  values aren't publicly documented.
-- **Ori and the Blind Forest**: entirely feel-fitted — the game is a
-  modern Unity title with no public frame-data tables. The model captures
-  the Triple Jump ability structure (a ground jump plus up to two air
-  jumps, count reset on landing) with a hold/release gravity switch; the
-  specific constants are approximations. Ori's figure is original pixel
-  art drawn for this sample — the game animates a skeletal rig, so no
-  sprite frames exist to rip. Ori is © Microsoft / Moon Studios.
+  low initial force under a low capped terminal velocity. The first jump's
+  height is fixed — Super Star's ground jump does not scale with hold
+  duration. *Approximated (feel-fitted):* the specific constants (6.0
+  force, 0.28125 rise / 0.09375 fall gravity, 2.5 fall cap, 2.0 flap,
+  0.75 float cap) — exact values aren't publicly documented.
+- **Ori and the Blind Forest**: physics entirely feel-fitted — a modern
+  Unity title with no public frame-data tables. The model captures the
+  Triple Jump ability structure (a ground jump plus up to two air jumps,
+  count reset on landing) with a hold/release gravity switch; the specific
+  constants are approximations. Ori's frames are the game's actual
+  hand-drawn animation art, extracted from the `seinPlatformingAtlas`
+  textures of a personally owned copy (the game is fully sprite-based) and
+  downscaled to the sample's scale; a pixel-art placeholder remains as the
+  fallback. Ori is © Microsoft / Moon Studios.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
