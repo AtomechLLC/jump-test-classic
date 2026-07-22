@@ -28,7 +28,7 @@ const S = v => v * SCALE;
 /* ------------------------------------------------------------------ blocks */
 
 const BLOCKS = [
-  { x: 0, w: 6, h: 4 },       // tiny curb: keeps walkers from wrapping off-screen
+  { x: 0, w: 6, h: 64 },      // left wall, 4 tiles — no jittering off the side
   { x: 262, w: 36, h: 32 },   // 2 tiles
   { x: 302, w: 36, h: 48 },   // 3 tiles
   { x: 342, w: 42, h: 64 },   // 4 tiles
@@ -389,11 +389,11 @@ const SPRITE_DEFS = {
     run5: 'mmx_run5', run6: 'mmx_run6', run7: 'mmx_run7', run8: 'mmx_run8',
     run9: 'mmx_run9', run10: 'mmx_run10',
     jump: 'mmx_jump', fall: 'mmx_fall', dash: 'mmx_dash' } },
-  kirby: { facesLeft: true, frames: {
+  kirby: { facesLeft: false, frames: {
     idle: 'kirby_idle', walk1: 'kirby_walk1', walk2: 'kirby_walk2',
-    walk3: 'kirby_walk3', jump: 'kirby_jump',
+    walk3: 'kirby_walk3', jump: 'kirby_jump', fall: 'kirby_fall',
     tumble1: 'kirby_tumble1', tumble2: 'kirby_tumble2',
-    tumble3: 'kirby_tumble3', tumble4: 'kirby_tumble4',
+    tumble3: 'kirby_tumble3',
     puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
     puff4: 'kirby_puff4' } },
   sonic: { facesLeft: false, frames: {
@@ -548,7 +548,8 @@ function newPlayerState(x) {
   return { x, y: GROUND, vx: 0, vy: 0, grounded: true, facing: 1,
            jumping: false, holdG: 0.125, fallG: 0.4375, pMeter: 0, dash: 0,
            sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
-           floating: false, freeze: 0, takeoffX: x, takeoffY: GROUND };
+           floating: false, freeze: 0, tumble: 0, flapAnim: 0,
+           takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -595,6 +596,7 @@ function stepPhysics(st, charKey, P, input) {
   } else if (charKey === 'kirby' && input.jumpPressed && !st.grounded) {
     st.floating = true;                  /* puff up — every press is a flap */
     st.vy = -P.flapImpulse;
+    st.flapAnim = 12;                    /* play the flap animation once */
   } else if (ASSISTS.buffer && input.jumpPressed && !st.grounded) {
     st.jumpBuffer = BUFFER_FRAMES;       /* remember the early press */
   }
@@ -803,9 +805,16 @@ function stepPhysics(st, charKey, P, input) {
         if (st.vy > P.floatTerminal) st.vy = P.floatTerminal;
       } else {
         /* asymmetric: burst up under high gravity, drift down under low */
-        st.vy += st.vy < 0 ? P.riseGravity : P.fallGravity;
+        if (st.vy < 0) {
+          st.vy += P.riseGravity;
+          if (st.vy >= 0) st.tumble = 12;    /* the apex flip */
+        } else {
+          st.vy += P.fallGravity;
+        }
         if (st.vy > P.terminal) st.vy = P.terminal;
       }
+      if (st.tumble > 0) st.tumble--;
+      if (st.flapAnim > 0) st.flapAnim--;
     } else if (charKey !== 'sonic') {   /* plain gravity + terminal cap */
       st.vy += P.gravity;
       if (st.vy > P.terminal) st.vy = P.terminal;
@@ -1161,9 +1170,15 @@ function spriteFrameKey() {
     if (charKey === 'megaman') return 'jump';       // one air pose, rise & fall
     if (charKey === 'megamanx') return player.vy < 0 ? 'jump' : 'fall';
     if (charKey === 'kirby') {
-      if (player.floating) return 'puff' + ((Math.floor(animClock / 5) % 4) + 1);
+      if (player.floating) {
+        if (player.flapAnim > 0)         /* one flap cycle per press */
+          return 'puff' + (Math.min(3, Math.floor((12 - player.flapAnim) / 3)) + 1);
+        return 'puff' + ((Math.floor(animClock / 16) % 2) + 1);   /* gentle bob */
+      }
       if (player.vy < 0) return 'jump';
-      return 'tumble' + ((Math.floor(animClock / 4) % 4) + 1);  // the flip
+      if (player.tumble > 0)             /* single somersault at the apex */
+        return 'tumble' + (Math.min(2, Math.floor((12 - player.tumble) / 4)) + 1);
+      return 'fall';
     }
     return player.jumping ? 'jump' : 'idle';
   }
@@ -1272,7 +1287,7 @@ function render() {
     for (let ty = b.y + TILE; ty < b.y + b.h; ty += TILE) {
       ctx.beginPath(); ctx.moveTo(S(b.x), S(ty)); ctx.lineTo(S(b.x + b.w), S(ty)); ctx.stroke();
     }
-    if (b.h >= TILE) {
+    if (b.h >= TILE && b.w >= 24) {
       ctx.fillStyle = '#8a7b6a';
       ctx.textAlign = 'center';
       ctx.fillText(`${b.h / TILE} tiles`, S(b.x + b.w / 2), S(b.y) + 15);
