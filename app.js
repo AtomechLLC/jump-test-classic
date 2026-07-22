@@ -947,6 +947,21 @@ bindTouchButton('tc-run',   () => { keys['shift'] = true; },      () => { keys['
 bindTouchButton('tc-jump',  () => { keys[' '] = true; jumpQueued = true; },
                             () => { keys[' '] = false; });
 
+/* portrait hint: offer fullscreen landscape where the platform allows it */
+if (el('rotate-go')) {
+  el('rotate-go').addEventListener('click', async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+      if (screen.orientation && screen.orientation.lock)
+        await screen.orientation.lock('landscape');
+    } catch (e) { /* iOS Safari has no orientation lock — rotating by hand works */ }
+    el('rotate-hint').style.display = 'none';
+  });
+  el('rotate-close').addEventListener('click', () => {
+    el('rotate-hint').style.display = 'none';
+  });
+}
+
 function readInput() {
   const left = keys['arrowleft'] || keys['a'];
   const right = keys['arrowright'] || keys['d'];
