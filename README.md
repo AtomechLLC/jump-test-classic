@@ -55,6 +55,13 @@ what the original games do) — and differ in what happens around the button:
   ways gives a ~7-tile apex and 1.5 s of hang time. Air control is capped at
   1.375 px/f but ground momentum is kept; hold run to build the +2 px/f dash.
   Moving jumps somersault.
+- **Mega Man 2 (Mega Man)** — purely digital movement: 1.296875 px/f the
+  instant you press, zero the instant you release, on the ground or mid-air.
+  Release-to-stop jump (0x04.DF force, 0.25 gravity). Total control.
+- **Mega Man X (X)** — the 16-bit refinement: same instant, cuttable jump
+  (5.0 force, 0.25 gravity) plus the dash — hold run for 3.5 px/f, and a
+  dash-jump keeps that speed for the whole arc. Same height, 2.3× the
+  distance.
 
 ## Game-feel assists
 
@@ -108,6 +115,15 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   and air accel (not documented), and the release-to-stop transition (the
   real game passes through a brief falling-transition state). No hi-jump
   boots, water physics, or wall jumps.
+- **Mega Man 2** ([nesdev reverse-engineering thread](https://forums.nesdev.org/viewtopic.php?t=10937)):
+  jump velocity 0x04.DF (4.87109375 px/f); walk 0x01.4C and gravity 0x00.40
+  (0.25) are the community-standard figures. *Approximated:* the famous
+  first-press "inch step" quirk is omitted, and terminal fall speed (7 here)
+  is not disassembly-verified.
+- **Mega Man X** ([TASVideos data page](https://tasvideos.org/GameResources/SNES/MegamanX/Data)):
+  walk 1.5, dash 3.5, jump 5.0, gravity 0.25, terminal 5.75 px/f.
+  *Approximated:* the dash is modeled as hold-to-dash rather than the real
+  timed burst, and wall slides/kicks are not implemented.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
@@ -126,10 +142,13 @@ request of any rights holder.
 
 Frames were sliced (scripts in `tools/`) from sheets on
 [The Spriters Resource](https://www.spriters-resource.com/): Mario & Luigi
-(SMB, NES) ripped by SuperJustinBros; Mario (Super Mario World, SNES) by
-Mister Man; Simon Belmont (Castlevania, NES) by Mister Mike; Sonic (Sonic
-the Hedgehog, Genesis) by Triangly; Samus Aran (Super Metroid, SNES)
-uploaded by "Barack Obama". Metroid is © Nintendo as well. If `assets/`
+(SMB, NES) ripped by SuperJustinBros; Simon Belmont (Castlevania, NES) and
+Mega Man (Mega Man 2, NES) by Mister Mike; Sonic (Sonic the Hedgehog,
+Genesis) by Triangly; Samus Aran (Super Metroid, SNES) uploaded by "Barack
+Obama"; X (Mega Man X, SNES) by Random Talking Bush. The Super Mario World
+small-Mario frames come from
+[Mario Universe](https://www.mariouniverse.com/sprites-snes-smw/).
+Metroid and Super Mario World are © Nintendo; Mega Man is © Capcom. If `assets/`
 is removed, the app automatically falls back to built-in placeholder pixel
 art, so the sample keeps running either way.
 

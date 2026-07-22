@@ -219,9 +219,75 @@ yVelocity -= gravity
 y         += yVelocity
 yVelocity -= 0.109375 <span class="hl">// floaty, both ways</span>`,
   },
+
+  megaman: {
+    name: 'Mega Man', game: 'Mega Man 2', accent: '#1e78c8',
+    hitboxW: 14,
+    defaults: {
+      walkSpeed: 1.296875,    // 0x01.4C
+      jumpForce: 4.87109375,  // 0x04.DF, from the nesdev disassembly thread
+      gravity: 0.25,          // 0x00.40
+      terminal: 7,
+    },
+    sliders: [
+      { key: 'jumpForce', label: 'Initial jump force', min: 2, max: 8, step: 0.0625 },
+      { key: 'gravity',   label: 'Gravity per frame',  min: 0.05, max: 0.6, step: 0.005 },
+      { key: 'walkSpeed', label: 'Walk speed',         min: 0.5, max: 3, step: 0.05 },
+    ],
+    explainer: `
+      <h2>The Mega Man Jump</h2>
+      <p>Digital movement, analog jump: walking has <i>no acceleration at
+      all</i> — 1.296875 px/frame the instant you press, zero the instant you
+      release, on the ground or in the air. The jump is Samus-style: release
+      while rising and upward speed is set to 0.</p>
+      <p class="rule"><b>The twist: total control.</b> With instant air
+      control at full walk speed and an instantly cuttable jump, every pixel
+      of the arc is yours — which is why Mega Man platforming can demand so
+      much precision.</p>`,
+    pseudocode:
+`xVelocity = dir * 1.296875 <span class="hl">// instant, even mid-air</span>
+if (!jumpHeld && rising)
+      yVelocity = 0
+y         += yVelocity
+yVelocity -= 0.25`,
+  },
+
+  megamanx: {
+    name: 'X', game: 'Mega Man X', accent: '#00a0a8',
+    hitboxW: 14,
+    defaults: {
+      walkSpeed: 1.5,     // TASVideos data page
+      dashSpeed: 3.5,
+      jumpForce: 5.0,
+      gravity: 0.25,
+      terminal: 5.75,
+    },
+    sliders: [
+      { key: 'jumpForce', label: 'Initial jump force', min: 2, max: 8, step: 0.0625 },
+      { key: 'gravity',   label: 'Gravity per frame',  min: 0.05, max: 0.6, step: 0.005 },
+      { key: 'walkSpeed', label: 'Walk speed',         min: 0.5, max: 3, step: 0.05 },
+      { key: 'dashSpeed', label: 'Dash speed',         min: 1, max: 6, step: 0.05 },
+    ],
+    explainer: `
+      <h2>The Mega Man X Jump</h2>
+      <p>The 16-bit evolution keeps the instant, cuttable jump (release while
+      rising → upward speed 0; same gravity 0.25) but adds the <i>dash</i>:
+      hold <kbd>Shift</kbd> to move at 3.5 px/frame instead of 1.5 — and a
+      jump started from a dash keeps that speed for the whole arc.</p>
+      <p class="rule"><b>The twist: the dash jump.</b> Same height, 2.3×
+      the distance. Every X game is balanced around it. (Wall slides and
+      wall kicks exist in the real game but not in this sample.)</p>`,
+    pseudocode:
+`xVelocity = dir * (dashing ? 3.5 : 1.5)
+<span class="hl">// dash-jumps keep 3.5 in the air</span>
+if (!jumpHeld && rising)
+      yVelocity = 0
+y         += yVelocity
+yVelocity -= 0.25`,
+  },
 };
 
-const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid'];
+const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx'];
 
 /* ---- modern game-feel assists (toggleable, applied to every character) ---- */
 const COYOTE_FRAMES = 6;   // grace window after walking off a ledge
@@ -269,6 +335,14 @@ const SPRITE_DEFS = {
     spin1: 'samus_spin1', spin2: 'samus_spin2', spin3: 'samus_spin3',
     spin4: 'samus_spin4', spin5: 'samus_spin5', spin6: 'samus_spin6',
     spin7: 'samus_spin7', spin8: 'samus_spin8' } },
+  megaman: { facesLeft: true, frames: {
+    idle: 'mm_idle', run1: 'mm_run1', run2: 'mm_run2', run3: 'mm_run3',
+    jump: 'mm_jump' } },
+  megamanx: { facesLeft: false, frames: {
+    idle: 'mmx_idle',
+    run1: 'mmx_run1', run2: 'mmx_run2', run3: 'mmx_run3', run4: 'mmx_run4',
+    run5: 'mmx_run5', run6: 'mmx_run6', run7: 'mmx_run7', run8: 'mmx_run8',
+    jump: 'mmx_jump', fall: 'mmx_fall', dash: 'mmx_dash' } },
   sonic: { facesLeft: false, frames: {
     idle: 'sonic_idle',
     walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
@@ -348,6 +422,10 @@ FALLBACK_MAPS.smw = FALLBACK_MAPS.mario;        // same silhouette works fine
 FALLBACK_PALETTES.smw = FALLBACK_PALETTES.mario;
 FALLBACK_MAPS.metroid = FALLBACK_MAPS.castlevania;   // tall silhouette
 FALLBACK_PALETTES.metroid = { d: '#7a2010', a: '#d8b020', s: '#e08030' };
+FALLBACK_MAPS.megaman = FALLBACK_MAPS.mario;
+FALLBACK_PALETTES.megaman = { r: '#1e78c8', h: '#0a3f8c', s: '#f8d8b0', b: '#40b8f0', y: '#f8d820' };
+FALLBACK_MAPS.megamanx = FALLBACK_MAPS.mario;
+FALLBACK_PALETTES.megamanx = { r: '#00a0a8', h: '#005060', s: '#f8d8b0', b: '#70d8e0', y: '#f8d820' };
 
 /* frameKey → fallback pixel map, per character */
 function fallbackMapFor(charKey, frameKey) {
@@ -467,8 +545,9 @@ function stepPhysics(st, charKey, P, input) {
   if (charKey === 'sonic' && st.jumping && !input.jumpHeld && st.vy < -P.releaseCap)
     st.vy = -P.releaseCap;
 
-  /* Samus's variable jump: release while rising and the ascent just ends */
-  if (charKey === 'metroid' && st.jumping && !input.jumpHeld && st.vy < 0)
+  /* Samus / Mega Man / X variable jump: release while rising → ascent ends */
+  if ((charKey === 'metroid' || charKey === 'megaman' || charKey === 'megamanx') &&
+      st.jumping && !input.jumpHeld && st.vy < 0)
     st.vy = 0;
 
   /* horizontal control */
@@ -553,6 +632,21 @@ function stepPhysics(st, charKey, P, input) {
     } else if (st.grounded && st.vx !== 0) {
       st.vx = Math.abs(st.vx) <= P.accel ? 0 : st.vx - Math.sign(st.vx) * P.accel;
     }
+  } else if (charKey === 'megaman') {
+    /* purely digital: full speed or nothing, ground and air alike */
+    st.vx = input.dir * P.walkSpeed;
+  } else if (charKey === 'megamanx') {
+    if (input.dir !== 0) {
+      if (st.grounded) {
+        st.vx = input.dir * (input.run ? P.dashSpeed : P.walkSpeed);
+      } else {
+        /* a dash-jump keeps its speed while you hold the same direction */
+        const keep = Math.abs(st.vx) > P.walkSpeed && Math.sign(st.vx) === input.dir;
+        st.vx = input.dir * (keep ? Math.abs(st.vx) : P.walkSpeed);
+      }
+    } else {
+      st.vx = 0;                       /* instant stop, even mid-air */
+    }
   } else { /* sonic */
     if (input.dir !== 0) {
       if (st.grounded && st.vx !== 0 && Math.sign(st.vx) !== input.dir) {
@@ -629,7 +723,7 @@ function stepPhysics(st, charKey, P, input) {
     if (charKey === 'mario' || charKey === 'smw') {
       st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
       if (st.vy > P.terminal) st.vy = P.terminal;
-    } else if (charKey === 'castlevania' || charKey === 'metroid') {
+    } else if (charKey !== 'sonic') {   /* plain gravity + terminal cap */
       st.vy += P.gravity;
       if (st.vy > P.terminal) st.vy = P.terminal;
     } else { /* sonic — no fall speed cap in Sonic 1 */
@@ -677,7 +771,8 @@ let jumpQueued = false;
 
 /* ---- auto demo: run, full-hold jump, admire the stats, next character ---- */
 
-const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170, metroid: 165 };
+const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170,
+                      metroid: 165, megaman: 180, megamanx: 165 };
 const demo = { phase: 'off', timer: 0 };
 
 function startDemo() {
@@ -809,6 +904,8 @@ addEventListener('keydown', e => {
   if (e.key === '3') selectChar('smw');
   if (e.key === '4') selectChar('sonic');
   if (e.key === '5') selectChar('metroid');
+  if (e.key === '6') selectChar('megaman');
+  if (e.key === '7') selectChar('megamanx');
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -899,12 +996,20 @@ function spriteFrameKey() {
         return 'spin' + ((Math.floor(animClock / 3) % 8) + 1);
       return player.vy < 0 ? 'jump' : 'fall';
     }
+    if (charKey === 'megaman') return 'jump';       // one air pose, rise & fall
+    if (charKey === 'megamanx') return player.vy < 0 ? 'jump' : 'fall';
     return player.jumping ? 'jump' : 'idle';
   }
   if (speed > 0.05) {
     if (charKey === 'metroid') {
       const d = Math.max(2, Math.round(5 - speed * 0.6));
       return 'run' + ((Math.floor(animClock / d) % 10) + 1);
+    }
+    if (charKey === 'megaman')
+      return 'run' + ((Math.floor(animClock / 6) % 3) + 1);
+    if (charKey === 'megamanx') {
+      if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05) return 'dash';
+      return 'run' + ((Math.floor(animClock / 4) % 8) + 1);
     }
     if (charKey === 'sonic') {
       const d = Math.max(1, Math.floor(8 - speed));                // SPG walk timing
