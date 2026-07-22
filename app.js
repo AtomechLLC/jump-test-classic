@@ -440,7 +440,8 @@ const SPRITE_DEFS = {
     run1: 'mmx_run1', run2: 'mmx_run2', run3: 'mmx_run3', run4: 'mmx_run4',
     run5: 'mmx_run5', run6: 'mmx_run6', run7: 'mmx_run7', run8: 'mmx_run8',
     run9: 'mmx_run9', run10: 'mmx_run10',
-    jump: 'mmx_jump', fall: 'mmx_fall', dash: 'mmx_dash' } },
+    jump: 'mmx_jump', fall: 'mmx_fall',
+    dash1: 'mmx_dash1', dash2: 'mmx_dash2' } },
   kirby: { facesLeft: false, frames: {
     idle: 'kirby_idle', walk1: 'kirby_walk1', walk2: 'kirby_walk2',
     walk3: 'kirby_walk3', jump: 'kirby_jump', fall: 'kirby_fall',
@@ -467,7 +468,7 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 7;         // bump when sprite files change, so caches can't
+const ASSET_V = 8;         // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -659,7 +660,8 @@ function newPlayerState(x) {
            sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
            floating: false, freeze: 0, tumble: 0, flapAnim: 0,
            jumpsUsed: 0, airFlip: 0, chainStage: 0, chainTimer: 0,
-           lastChainStage: 0, sustain: 0, takeoffX: x, takeoffY: GROUND };
+           lastChainStage: 0, sustain: 0, dashTime: 0, fallTime: 0,
+           takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -858,6 +860,9 @@ function stepPhysics(st, charKey, P, input) {
     } else {
       st.vx = 0;                       /* instant stop, even mid-air */
     }
+    /* dash pose timing: the crouch-in frame, then the full stretch */
+    st.dashTime = (st.grounded && Math.abs(st.vx) > P.walkSpeed + 0.05)
+      ? (st.dashTime || 0) + 1 : 0;
   } else { /* sonic */
     if (input.dir !== 0) {
       if (st.grounded && st.vx !== 0 && Math.sign(st.vx) !== input.dir) {
@@ -962,6 +967,7 @@ function stepPhysics(st, charKey, P, input) {
           st.vy += P.fallGravity;
         }
         if (st.vy > P.terminal) st.vy = P.terminal;
+        st.fallTime = st.vy > 0 ? (st.fallTime || 0) + 1 : 0;
       }
       if (st.tumble > 0) st.tumble--;
       if (st.flapAnim > 0) st.flapAnim--;
@@ -1342,9 +1348,10 @@ function spriteFrameKey() {
         return 'puff' + ((Math.floor(animClock / 16) % 2) + 1);   /* gentle bob */
       }
       if (player.vy < 0) return 'jump';
-      if (player.tumble > 0)             /* single somersault at the apex */
-        return 'tumble' + (Math.min(2, Math.floor((12 - player.tumble) / 4)) + 1);
-      return 'fall';
+      if (player.tumble > 0)             /* the apex flip, ending head-first */
+        return ['tumble2', 'tumble3', 'tumble1'][Math.min(2, Math.floor((12 - player.tumble) / 4))];
+      if (player.fallTime > 45) return 'fall';   /* long falls: the flail */
+      return 'tumble1';                  /* the dive, held all the way down */
     }
     return player.jumping ? 'jump' : 'idle';
   }
@@ -1362,7 +1369,8 @@ function spriteFrameKey() {
     if (charKey === 'ori')            /* full 13-frame cycle, 60 fps */
       return 'run' + ((animClock % 13) + 1);
     if (charKey === 'megamanx') {
-      if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05) return 'dash';
+      if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05)
+        return player.dashTime < 5 ? 'dash1' : 'dash2';
       return 'run' + ((Math.floor(animClock / 4) % 10) + 1);
     }
     if (charKey === 'sonic') {
