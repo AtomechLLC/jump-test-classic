@@ -39,6 +39,18 @@ h1 {
 .credit { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
 .credit a { color: var(--accent); }
 
+.discord-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #5865f2 !important;
+  font-weight: bold;
+  text-decoration: none;
+  vertical-align: middle;
+}
+.discord-link svg { width: 18px; height: 14px; }
+.discord-link:hover { text-decoration: underline; }
+
 /* ---- character tabs ---- */
 .char-tabs { display: flex; gap: 8px; }
 .char-tab {
