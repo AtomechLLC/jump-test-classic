@@ -167,14 +167,17 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   against captured gameplay footage: the measured full-jump rise (~28.5
   frames) matches the source-predicted 28.8, and the arc is symmetric on
   video as predicted. Frames render at 1:1
-  native pixels; the run is the full 13-frame hand-drawn cycle (smear
-  frames included) advancing every screen frame, 60 fps. *Approximated:*
+  native pixels, and every animation is the complete authored sequence
+  read from the game's own atlas metadata (frame names, UV rects, and
+  order parsed from the `seinPlatformingAtlas`/`seinJumpingAtlas` Meta
+  objects of a personally owned copy): a 60-frame run cycle, 40-frame
+  idle, 36-frame fall, the three chained jumps (27/34/40 frames —
+  `jump`, `jumpB`, `jumpC` in the data, matching SeinJump's indexed
+  array), and the 20-frame Double Jump spin, all played at the engine's
+  30 fps (`TimeToFrame = t × 30` in TextureAnimation). *Approximated:*
   the release deceleration rate (JumpStopDeceleration) and the Double
-  Jump force, both serialized in scene data rather than code. Ori's
-  frames are the game's actual
-  hand-drawn animation art, extracted from the `seinPlatformingAtlas`
-  textures of a personally owned copy (the game is fully sprite-based);
-  a pixel-art placeholder remains as the
+  Jump force, both serialized in scene data rather than code.
+  A pixel-art placeholder remains as the
   fallback. Ori is © Microsoft / Moon Studios.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame

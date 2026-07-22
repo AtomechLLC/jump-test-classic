@@ -453,13 +453,16 @@ const SPRITE_DEFS = {
     spit1: 'kirby_spit1', spit2: 'kirby_spit2',
     airpuff: 'kirby_airpuff' } },
   /* Ori's frames ship at the game's native resolution and draw at 1:1
-     screen pixels (scale = 1/SCALE), so no resampling ever happens. */
-  ori: { facesLeft: false, scale: 1 / SCALE, frames: {
-    idle: 'ori_idle',
-    ...Object.fromEntries(Array.from({ length: 13 },
-      (_, i) => ['run' + (i + 1), 'ori_run' + (i + 1)])),
-    skip: 'ori_skip', hop: 'ori_hop', flip: 'ori_flip',
-    fall: 'ori_fall' } },
+     screen pixels (scale = 1/SCALE). Every animation is the complete
+     sequence from the game's atlas metadata, in authored order; the
+     native art faces left. Counts live in ORI_ANIM. */
+  ori: { facesLeft: true, scale: 1 / SCALE, frames: (() => {
+    const f = {};
+    for (const [p, n] of [['run', 60], ['idle', 40], ['fall', 36],
+                          ['skip', 27], ['hop', 34], ['flip', 40], ['dj', 20]])
+      for (let i = 1; i <= n; i++) f[p + i] = 'ori_' + p + i;
+    return f;
+  })() },
   sonic: { facesLeft: false, frames: {
     idle: 'sonic_idle',
     walk1: 'sonic_walk1', walk2: 'sonic_walk2', walk3: 'sonic_walk3',
@@ -471,7 +474,7 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 9;         // bump when sprite files change, so caches can't
+const ASSET_V = 10;        // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -662,7 +665,7 @@ function newPlayerState(x) {
            jumping: false, holdG: 0.125, fallG: 0.4375, pMeter: 0, dash: 0,
            sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
            floating: false, freeze: 0, tumble: 0, flapAnim: 0,
-           jumpsUsed: 0, airFlip: 0, chainStage: 0, chainTimer: 0,
+           jumpsUsed: 0, oriAnim: 'skip', oriT: 0, chainStage: 0, chainTimer: 0,
            lastChainStage: 0, sustain: 0, dashTime: 0, fallTime: 0,
            runHeld: false, spitAnim: 0, spitFx: null,
            takeoffX: x, takeoffY: GROUND };
@@ -717,8 +720,9 @@ function stepPhysics(st, charKey, P, input) {
         /* the ground chain: skip, hop, flip — heights 3 / 3.75 / 4.5 */
         const stage = st.chainTimer > 0 ? Math.min(2, st.chainStage) : 0;
         st.vy = -P.jumpForce * Math.sqrt(C.chainRatios[stage]);
-        st.lastChainStage = stage;                     /* skip / hop / flip pose */
-        if (stage === 2) st.airFlip = 18;              /* the flip */
+        st.lastChainStage = stage;
+        st.oriAnim = ['skip', 'hop', 'flip'][stage];   /* the jump's own sequence */
+        st.oriT = 0;
         st.chainStage = stage === 2 ? 0 : stage + 1;
         st.jumpsUsed = 1;
         /* release-to-shorten budget: full for skip/hop, half for the flip
@@ -732,7 +736,7 @@ function stepPhysics(st, charKey, P, input) {
     st.vy = -P.airJumpForce;             /* the Double Jump */
     st.jumpsUsed++;
     st.jumping = true;
-    st.airFlip = 14;
+    st.oriAnim = 'dj'; st.oriT = 0;      /* the spin-ball sequence */
     st.sustain = P.airJumpForce;
   } else if (charKey === 'kirby' && input.jumpPressed && !st.grounded) {
     st.floating = true;                  /* puff up — every press is a flap */
@@ -972,7 +976,7 @@ function stepPhysics(st, charKey, P, input) {
       }
       if (st.vy >= 0) st.sustain = 0;
       if (st.vy > P.terminal) st.vy = P.terminal;
-      if (st.airFlip > 0) st.airFlip--;
+      st.oriT = (st.oriT || 0) + 1;      /* advance the air sequence */
     } else if (charKey === 'kirby') {
       if (st.floating) {
         st.vy += P.floatGravity;         /* puffed: parachute drift */
@@ -1120,7 +1124,7 @@ function buildTabs() {
     num.className = 'tab-key';
     num.textContent = i + 1;
     btn.append(num);
-    const spr = SPRITE_CACHE[key].idle;
+    const spr = SPRITE_CACHE[key].idle || SPRITE_CACHE[key].idle1;
     if (spr) {
       const icon = document.createElement('canvas');
       icon.width = spr.w; icon.height = spr.h;
@@ -1335,6 +1339,10 @@ function tick() {
   animClock++;
 }
 
+/* Ori's TextureAnimation system plays at 30 fps (TimeToFrame = t*30),
+   so every sequence advances one frame per two 60 Hz ticks. */
+const ORI_ANIM = { run: 60, idle: 40, fall: 36, skip: 27, hop: 34, flip: 40, dj: 20 };
+
 const MARIO_WALK = ['run1', 'run2', 'run3'];
 const SONIC_WALK = ['walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6'];
 const SONIC_RUN = ['frun1', 'frun2', 'frun3', 'frun4'];
@@ -1357,10 +1365,12 @@ function spriteFrameKey() {
     if (charKey === 'megaman') return 'jump';       // one air pose, rise & fall
     if (charKey === 'megamanx') return player.vy < 0 ? 'jump' : 'fall';
     if (charKey === 'ori') {
-      if (player.airFlip > 0) return 'flip';        // third jump / air jump
-      if (player.vy < 0)
-        return ['skip', 'hop', 'flip'][player.lastChainStage || 0];
-      return 'fall';
+      /* play the takeoff's own sequence (skip/hop/flip/double jump)
+         through, then settle into the falling loop */
+      const kind = player.oriAnim || 'skip';
+      const idx = Math.floor((player.oriT || 0) / 2);
+      if (idx < ORI_ANIM[kind]) return kind + (idx + 1);
+      return 'fall' + (Math.floor(animClock / 2) % ORI_ANIM.fall + 1);
     }
     if (charKey === 'kirby') {
       if (player.spitAnim > 0)           /* exhale: squeeze, then the spit */
@@ -1389,8 +1399,8 @@ function spriteFrameKey() {
       const d = Math.max(3, Math.round(8 - speed * 2));
       return 'walk' + ((Math.floor(animClock / d) % 3) + 1);
     }
-    if (charKey === 'ori')            /* full 13-frame cycle, 60 fps */
-      return 'run' + ((animClock % 13) + 1);
+    if (charKey === 'ori')            /* the full 60-frame cycle, 30 fps */
+      return 'run' + (Math.floor(animClock / 2) % ORI_ANIM.run + 1);
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05)
         return player.dashTime < 5 ? 'dash1' : 'dash2';
@@ -1412,6 +1422,8 @@ function spriteFrameKey() {
     }
     return MARIO_WALK[Math.floor(animClock / 8) % 3];              // simon
   }
+  if (charKey === 'ori')              /* the 40-frame breathing idle */
+    return 'idle' + (Math.floor(animClock / 2) % ORI_ANIM.idle + 1);
   return 'idle';
 }
 
