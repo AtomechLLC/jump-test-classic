@@ -293,7 +293,7 @@ yVelocity -= 0.25`,
     defaults: {
       walkSpeed: 1.25,       // Super Star movement, approximated
       runSpeed: 2.5,         // dash: roughly double walk speed
-      jumpForce: 6.0,        // high force + high rising gravity = upward burst
+      jumpForce: 9.0,        // high force + high rising gravity = upward burst
       riseGravity: 0.28125,  // higher gravity while ascending
       fallGravity: 0.09375,  // once Y velocity hits 0, lower gravity is used
       terminal: 2.5,         // Kirby never falls fast
@@ -334,16 +334,20 @@ else             yVelocity -= 0.094 <span class="hl">// drift down</span>`,
     name: 'Ori', game: 'Ori and the Blind Forest', accent: '#4aa8d8',
     hitboxW: 12,
     defaults: {
-      topSpeed: 2.8,          // all values feel-fitted — see README
+      topSpeed: 2.8,          // movement feel-fitted — see README
       accel: 0.3,
       friction: 0.35,
-      jumpForce: 4.6,
+      jumpForce: 4.6,         // first jump of the chain
+      chainWindow: 12,        // frames after landing to continue the chain
       airJumpForce: 4.0,
       holdGravity: 0.17,
       releaseGravity: 0.4,
       terminal: 5,
-      airJumps: 2,            // Double Jump + the Triple Jump upgrade
+      airJumps: 1,            // the Double Jump ability
     },
+    /* ground-chain height ratios from the SeinJump source:
+       FirstJumpHeight 3, SecondJumpHeight 3.75, ThirdJumpHeight 4.5 */
+    chainRatios: [1, 1.25, 1.5],
     sliders: [
       { key: 'jumpForce',      label: 'Initial jump force',    min: 2, max: 8, step: 0.1 },
       { key: 'airJumpForce',   label: 'Air jump force',        min: 1, max: 8, step: 0.1 },
@@ -353,17 +357,19 @@ else             yVelocity -= 0.094 <span class="hl">// drift down</span>`,
     ],
     explainer: `
       <h2>The Ori Jump</h2>
-      <p>The fifth answer to variable height: <i>jump again.</i> Blind
-      Forest's ability tree literally sells it — Double Jump, then the
-      Triple Jump upgrade. Press jump in mid-air (up to twice) and a fresh
-      impulse fires from wherever you are; the count resets on landing.
-      Each jump is soft-gravity while held, heavy when released.</p>
-      <p class="rule"><b>The twist: the arc is a sequence.</b> One dashed
-      line, three humps — height, distance, and course-correction all come
-      from <i>when</i> you spend the next jump. Try the air-jumps slider.</p>`,
+      <p>The triple jump lives <i>on the ground</i>: land and jump again
+      within a beat and the chain escalates — skip, hop, then a spinning
+      flip. The jump heights come straight from the SeinJump source:
+      3, then 3.75, then 4.5 units (a 1 : 1.25 : 1.5 ladder). Miss the
+      window and the chain resets. Each jump is soft-gravity while held,
+      heavy when released, plus one mid-air Double Jump.</p>
+      <p class="rule"><b>The twist: rhythm.</b> The best height isn't a
+      button you hold — it's a beat you keep. Land, jump, land, jump,
+      <i>flip.</i></p>`,
     pseudocode:
-`<span class="hl">if (airborne && jumpPressed && used &lt; 3)
-      yVelocity = airJumpForce, used++</span>
+`<span class="hl">onLand: window = 12 frames
+if (jump within window) stage++
+heights: 3 → 3.75 → 4.5 (flip)</span>
 y += yVelocity
 if (rising && jumpHeld)
       yVelocity -= 0.17
@@ -435,7 +441,7 @@ const SPRITE_DEFS = {
     tumble3: 'kirby_tumble3',
     puff1: 'kirby_puff1', puff2: 'kirby_puff2', puff3: 'kirby_puff3',
     puff4: 'kirby_puff4' } },
-  ori: { facesLeft: true, frames: {
+  ori: { facesLeft: false, frames: {
     idle: 'ori_idle', run1: 'ori_run1', run2: 'ori_run2',
     jump: 'ori_jump', fall: 'ori_fall', flip: 'ori_flip' } },
   sonic: { facesLeft: false, frames: {
@@ -634,7 +640,8 @@ function newPlayerState(x) {
            jumping: false, holdG: 0.125, fallG: 0.4375, pMeter: 0, dash: 0,
            sprintJump: false, spinJump: false, coyoteTimer: 0, jumpBuffer: 0,
            floating: false, freeze: 0, tumble: 0, flapAnim: 0,
-           jumpsUsed: 0, airFlip: 0, takeoffX: x, takeoffY: GROUND };
+           jumpsUsed: 0, airFlip: 0, chainStage: 0, chainTimer: 0,
+           takeoffX: x, takeoffY: GROUND };
 }
 
 function hitboxH(charKey, st) {
@@ -653,6 +660,12 @@ function stepPhysics(st, charKey, P, input) {
   /* assist timers */
   if (st.jumpBuffer > 0) st.jumpBuffer--;
   if (!st.grounded && st.coyoteTimer > 0) st.coyoteTimer--;
+
+  /* Ori's chain window ticks down on the ground; expiry resets the chain */
+  if (charKey === 'ori' && st.grounded && st.chainTimer > 0) {
+    st.chainTimer--;
+    if (st.chainTimer === 0) st.chainStage = 0;
+  }
 
   /* jump start — directly, via a buffered early press, or via coyote time */
   const buffered = ASSISTS.buffer && st.grounded && st.jumpBuffer > 0;
@@ -676,7 +689,14 @@ function stepPhysics(st, charKey, P, input) {
     } else {
       st.vy = -P.jumpForce;
       if (charKey === 'metroid') st.spinJump = Math.abs(st.vx) > 0.2;
-      if (charKey === 'ori') { st.jumpsUsed = 1; st.holdG = P.holdGravity; st.fallG = P.releaseGravity; }
+      if (charKey === 'ori') {
+        /* the ground chain: skip, hop, flip — heights 3 / 3.75 / 4.5 */
+        const stage = st.chainTimer > 0 ? Math.min(2, st.chainStage) : 0;
+        st.vy = -P.jumpForce * Math.sqrt(C.chainRatios[stage]);
+        if (stage === 2) st.airFlip = 18;              /* the flip */
+        st.chainStage = stage === 2 ? 0 : stage + 1;
+        st.jumpsUsed = 1; st.holdG = P.holdGravity; st.fallG = P.releaseGravity;
+      }
     }
     st.grounded = false; st.jumping = true; ev.jumped = true;
   } else if (charKey === 'ori' && input.jumpPressed && !st.grounded &&
@@ -860,7 +880,7 @@ function stepPhysics(st, charKey, P, input) {
 
     const prevY = st.y;
     st.y += st.vy;
-    if (st.y - hh < 0) { st.y = hh; if (st.vy < 0) st.vy = 0; }  /* world ceiling */
+    /* no ceiling — overshoot the top and gravity brings you back */
     let onGround = false;
     if (st.vy >= 0) {
       if (st.y >= GROUND) { st.y = GROUND; onGround = true; }
@@ -881,6 +901,7 @@ function stepPhysics(st, charKey, P, input) {
 
     if (onGround) {
       if (!st.grounded) ev.landed = true;
+      if (!st.grounded && charKey === 'ori') st.chainTimer = P.chainWindow;
       st.grounded = true; st.vy = 0; st.jumping = false; st.floating = false;
       st.jumpsUsed = 0;
     } else if (st.grounded) {
@@ -968,6 +989,7 @@ function startDemo() {
   player = newPlayerState(70);
   arc = []; lastArc = []; ghosts = [];
   demo.phase = 'wait'; demo.timer = 30; demo.flutterDone = false;
+  demo.chainCount = 0;
 }
 
 function stopDemo() { demo.phase = 'off'; }
@@ -994,15 +1016,19 @@ function demoInput() {
           demo.timer = 0;
           return { ...move, jumpHeld: true, jumpPressed: true };
         }
+        if (charKey === 'ori' && (demo.chainCount || 0) < 2) {
+          /* Ori's showcase: chain the landing into the next jump — skip,
+             hop, flip */
+          demo.chainCount = (demo.chainCount || 0) + 1;
+          demo.timer = 0;
+          return { ...move, jumpHeld: true, jumpPressed: true };
+        }
         demo.phase = 'admire'; demo.timer = 100; return idle;
       }
       demo.timer++;
       const flap = charKey === 'kirby' && demo.flutterDone &&
                    demo.timer > 10 && demo.timer < 150 && player.vy > 0.4;
-      /* Ori's showcase: spend the double and triple jump as the fall begins */
-      const airJump = charKey === 'ori' && demo.timer > 8 && player.vy > 0.8 &&
-                      player.jumpsUsed < 3;
-      return { ...move, jumpHeld: true, jumpPressed: flap || airJump };
+      return { ...move, jumpHeld: true, jumpPressed: flap };
     }
     case 'admire':
       if (--demo.timer <= 0) {

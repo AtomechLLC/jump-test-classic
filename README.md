@@ -67,10 +67,11 @@ what the original games do) — and differ in what happens around the button:
   under low), then press jump mid-air to puff up — every press flaps
   upward, and while puffed Kirby parachutes down at a fraction of normal
   fall speed, indefinitely. Flight as forgiveness.
-- **Ori and the Blind Forest (Ori)** — the fifth answer: jump again. Up to
-  two air jumps (the Double and Triple Jump abilities) each fire a fresh
-  impulse mid-arc, resetting on landing; every jump is soft-gravity while
-  held. One dashed line, three humps.
+- **Ori and the Blind Forest (Ori)** — the fifth answer: rhythm. The
+  triple jump is a *ground* chain — land and jump again within a beat and
+  the sequence escalates skip → hop → spinning flip, with jump heights
+  3 → 3.75 → 4.5 (from the SeinJump source). Miss the window and it
+  resets. Soft-gravity while held, plus one mid-air Double Jump.
 
 ## Game-feel assists
 
@@ -142,14 +143,15 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   a much lower gravity once Y velocity reaches 0, and float jumps with a
   low initial force under a low capped terminal velocity. The first jump's
   height is fixed — Super Star's ground jump does not scale with hold
-  duration. *Approximated (feel-fitted):* the specific constants (6.0
+  duration. *Approximated (feel-fitted):* the specific constants (9.0
   force, 0.28125 rise / 0.09375 fall gravity, 2.5 fall cap, 2.0 flap,
   0.75 float cap) — exact values aren't publicly documented.
-- **Ori and the Blind Forest**: physics entirely feel-fitted — a modern
-  Unity title with no public frame-data tables. The model captures the
-  Triple Jump ability structure (a ground jump plus up to two air jumps,
-  count reset on landing) with a hold/release gravity switch; the specific
-  constants are approximations. Ori's frames are the game's actual
+- **Ori**: the ground-chain heights are sourced — FirstJumpHeight 3,
+  SecondJumpHeight 3.75, ThirdJumpHeight 4.5 (a 1 : 1.25 : 1.5 ladder,
+  read from the SeinJump controller in a fan-provided Will of the Wisps
+  source tree; jump velocities here scale as √height to preserve the
+  ratios). *Approximated:* the chain window (12 frames), movement speeds,
+  the gravity pair, and the Double Jump force. Ori's frames are the game's actual
   hand-drawn animation art, extracted from the `seinPlatformingAtlas`
   textures of a personally owned copy (the game is fully sprite-based) and
   downscaled to the sample's scale; a pixel-art placeholder remains as the
