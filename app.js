@@ -291,8 +291,8 @@ yVelocity -= 0.25`,
     name: 'Kirby', game: 'Kirby Super Star', accent: '#e0679f',
     hitboxW: 16,
     defaults: {
-      walkSpeed: 1.296875,   // 332 subpx/frame (TASVideos)
-      runSpeed: 1.796875,    // 460 subpx/frame
+      walkSpeed: 1.25,       // Super Star movement, approximated
+      runSpeed: 2.5,         // dash: roughly double walk speed
       jumpForce: 5.0,        // high force + high rising gravity = upward burst
       riseGravity: 0.28125,  // higher gravity while ascending
       fallGravity: 0.09375,  // once Y velocity hits 0, lower gravity is used
@@ -319,9 +319,8 @@ yVelocity -= 0.25`,
       up: float jumps use a low initial force and a low capped terminal
       velocity. Forever.</p>
       <p class="rule"><b>The twist: flight as forgiveness.</b> Missed the
-      ledge? Flap. Documented quirk: releasing A halts Kirby's movement for
-      one frame. Ground speeds are the real 332/460 subpixels per frame;
-      hold <kbd>Shift</kbd> to run.</p>`,
+      ledge? Flap. Ground movement is Super Star style: an instant walk and
+      a double-speed dash on <kbd>Shift</kbd>.</p>`,
     pseudocode:
 `<span class="hl">if (airborne && jumpPressed)
       puffed = true, yVelocity = flap</span>
@@ -407,6 +406,8 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
+const ASSET_V = 2;         // bump when sprite files change, so caches can't
+                           // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
    sprites are not redistributed with this repo — see README). */
@@ -535,7 +536,7 @@ function loadSprites() {
           SPRITE_CACHE[charKey][frameKey] = buildFallbackSprite(charKey, frameKey);
           resolve();
         };
-        img.src = `assets/${file}.png`;
+        img.src = `assets/${file}.png?v=${ASSET_V}`;
       }));
     }
   }
@@ -610,12 +611,10 @@ function stepPhysics(st, charKey, P, input) {
       st.jumping && !input.jumpHeld && st.vy < 0)
     st.vy = 0;
 
-  /* Kirby's jump cut, plus the documented one-frame halt on releasing A */
+  /* Kirby's jump cut */
   if (charKey === 'kirby' && st.jumping && !st.floating &&
-      !input.jumpHeld && st.vy < -P.releaseCap) {
+      !input.jumpHeld && st.vy < -P.releaseCap)
     st.vy = -P.releaseCap;
-    st.freeze = 1;
-  }
 
   /* horizontal control */
   if (charKey === 'castlevania') {
@@ -700,13 +699,9 @@ function stepPhysics(st, charKey, P, input) {
       st.vx = Math.abs(st.vx) <= P.accel ? 0 : st.vx - Math.sign(st.vx) * P.accel;
     }
   } else if (charKey === 'kirby') {
-    if (st.freeze > 0) {
-      st.freeze--; st.vx = 0;            /* one-frame halt after releasing A */
-    } else {
-      const cap = (!st.grounded && st.floating) ? P.floatSpeed
-                : (input.run ? P.runSpeed : P.walkSpeed);
-      st.vx = input.dir * cap;
-    }
+    const cap = (!st.grounded && st.floating) ? P.floatSpeed
+              : (input.run ? P.runSpeed : P.walkSpeed);
+    st.vx = input.dir * cap;
   } else if (charKey === 'megaman') {
     /* purely digital: full speed or nothing, ground and air alike */
     st.vx = input.dir * P.walkSpeed;

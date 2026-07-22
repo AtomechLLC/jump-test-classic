@@ -129,13 +129,11 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   walk 1.5, dash 3.5, jump 5.0, gravity 0.25, terminal 5.75 px/f.
   *Approximated:* the dash is modeled as hold-to-dash rather than the real
   timed burst, and wall slides/kicks are not implemented.
-- **Kirby** (sprites from Kirby Super Star;
-  [TASVideos Kirby's Adventure resources](https://tasvideos.org/GameResources/NES/KirbysAdventure)
-  for ground speeds): walk 332 and run 460 subpx/frame (1.296875 /
-  1.796875 px/f), and the documented quirk that releasing A halts movement
-  for one frame, are sourced from Kirby's Adventure — Super Star's own
-  constants aren't documented. The vertical model follows Celia Wagar's
-  Kirby Super Star jump diagram:
+- **Kirby Super Star**: no public disassembly documents its constants, so
+  everything here is feel-fitted. Ground movement is Super Star style —
+  instant walk (1.25 px/f) with a double-speed dash (2.5) on the run
+  button. The vertical model follows Celia Wagar's Kirby Super Star jump
+  diagram:
   high initial force with high gravity while ascending (an upward burst),
   a much lower gravity once Y velocity reaches 0, and float jumps with a
   low initial force under a low capped terminal velocity. *Approximated
