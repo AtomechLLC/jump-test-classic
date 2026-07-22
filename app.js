@@ -28,10 +28,10 @@ const S = v => v * SCALE;
 /* ------------------------------------------------------------------ blocks */
 
 const BLOCKS = [
-  { x: 0, w: 6, h: 64 },      // left wall, 4 tiles — no jittering off the side
-  { x: 262, w: 36, h: 32 },   // 2 tiles
-  { x: 302, w: 36, h: 48 },   // 3 tiles
-  { x: 342, w: 42, h: 64 },   // 4 tiles
+  { x: 0, w: 4, h: 64, wall: true },  // thin left wall, 4 tiles, drawn behind
+  { x: 262, w: 36, h: 32 },           // 2 tiles
+  { x: 302, w: 36, h: 48 },           // 3 tiles
+  { x: 342, w: 42, h: 64 },           // 4 tiles
 ].map(b => ({ ...b, y: GROUND - b.h }));
 
 /* -------------------------------------------------------------- characters */
@@ -288,8 +288,8 @@ yVelocity -= 0.25`,
   },
 
   kirby: {
-    name: 'Kirby', game: "Kirby's Adventure", accent: '#e0679f',
-    hitboxW: 13,
+    name: 'Kirby', game: 'Kirby Super Star', accent: '#e0679f',
+    hitboxW: 16,
     defaults: {
       walkSpeed: 1.296875,   // 332 subpx/frame (TASVideos)
       runSpeed: 1.796875,    // 460 subpx/frame
@@ -1266,6 +1266,16 @@ function render() {
   ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(0, S(GROUND)); ctx.lineTo(VIEW_W, S(GROUND)); ctx.stroke();
 
+  /* left wall first, so ruler lines and labels draw over it */
+  for (const b of BLOCKS) {
+    if (!b.wall) continue;
+    ctx.fillStyle = '#e7dfcc';
+    ctx.fillRect(S(b.x), S(b.y), S(b.w), S(b.h));
+    ctx.strokeStyle = '#c4b498';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(S(b.x), S(b.y), S(b.w), S(b.h));
+  }
+
   /* height ruler */
   ctx.font = '12px Georgia';
   ctx.textAlign = 'left';
@@ -1279,6 +1289,7 @@ function render() {
 
   /* blocks */
   for (const b of BLOCKS) {
+    if (b.wall) continue;
     ctx.fillStyle = '#f0ead9';
     ctx.fillRect(S(b.x), S(b.y), S(b.w), S(b.h));
     ctx.strokeStyle = '#b8a888';

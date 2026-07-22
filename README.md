@@ -62,10 +62,11 @@ what the original games do) — and differ in what happens around the button:
   (5.0 force, 0.25 gravity) plus the dash — hold run for 3.5 px/f, and a
   dash-jump keeps that speed for the whole arc. Same height, 2.3× the
   distance.
-- **Kirby's Adventure (Kirby)** — the fourth answer to variable height: why
-  land at all? A floaty jump, then press jump mid-air to puff up — every
-  press flaps upward, and while puffed Kirby parachutes down at a fraction
-  of normal fall speed, indefinitely. Flight as forgiveness.
+- **Kirby Super Star (Kirby)** — the fourth answer to variable height: why
+  land at all? An asymmetric jump (burst up under high gravity, drift down
+  under low), then press jump mid-air to puff up — every press flaps
+  upward, and while puffed Kirby parachutes down at a fraction of normal
+  fall speed, indefinitely. Flight as forgiveness.
 
 ## Game-feel assists
 
@@ -128,10 +129,13 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   walk 1.5, dash 3.5, jump 5.0, gravity 0.25, terminal 5.75 px/f.
   *Approximated:* the dash is modeled as hold-to-dash rather than the real
   timed burst, and wall slides/kicks are not implemented.
-- **Kirby's Adventure** ([TASVideos resources](https://tasvideos.org/GameResources/NES/KirbysAdventure)):
-  walk 332 and run 460 subpx/frame (1.296875 / 1.796875 px/f), and the
-  documented quirk that releasing A halts movement for one frame, are
-  sourced. The vertical model follows Celia Wagar's Kirby jump diagram:
+- **Kirby** (sprites from Kirby Super Star;
+  [TASVideos Kirby's Adventure resources](https://tasvideos.org/GameResources/NES/KirbysAdventure)
+  for ground speeds): walk 332 and run 460 subpx/frame (1.296875 /
+  1.796875 px/f), and the documented quirk that releasing A halts movement
+  for one frame, are sourced from Kirby's Adventure — Super Star's own
+  constants aren't documented. The vertical model follows Celia Wagar's
+  Kirby Super Star jump diagram:
   high initial force with high gravity while ascending (an upward burst),
   a much lower gravity once Y velocity reaches 0, and float jumps with a
   low initial force under a low capped terminal velocity. *Approximated
@@ -159,8 +163,8 @@ Frames were sliced (scripts in `tools/`) from sheets on
 (SMB, NES) ripped by SuperJustinBros; Simon Belmont (Castlevania, NES) and
 Mega Man (Mega Man 2, NES) by Mister Mike; Sonic (Sonic the Hedgehog,
 Genesis) by Triangly; Samus Aran (Super Metroid, SNES) uploaded by "Barack
-Obama"; X (Mega Man X, SNES) by Random Talking Bush; Kirby (Kirby's
-Adventure, NES) by Jermungandr. The Super Mario World small-Mario frames
+Obama"; X (Mega Man X, SNES) by Random Talking Bush; Kirby (Kirby Super
+Star, SNES) by Jermungandr. The Super Mario World small-Mario frames
 come from [Mario Universe](https://www.mariouniverse.com/sprites-snes-smw/).
 Metroid, Super Mario World, and Kirby are © Nintendo (Kirby with HAL
 Laboratory); Mega Man is © Capcom. If `assets/`
