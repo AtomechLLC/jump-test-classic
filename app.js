@@ -710,6 +710,16 @@ function buildFallbackSprite(charKey, frameKey) {
   return { right: make(false), left: make(true), w, h };
 }
 
+/* Ori's frames come from two atlases (platforming: idle/run/fall; jumping:
+   skip/hop/flip/dj) authored at different pixel densities. The game sizes
+   each frame's quad as ink_pixels / OriginalSize (AtlasSpriteTexture.
+   ApplyToMesh), and OriginalSize differs per animation — so raw pixels
+   render at inconsistent scales (idle biggest, the jumps smallest). Divide
+   by each animation's OriginalSize to bring them to one world scale; run's
+   188 is the reference (kept native, the rest scale to match). */
+const ORI_OS = { run: 188, idle: 256, fall: 184, skip: 146, hop: 146, flip: 137, dj: 150 };
+const ORI_OS_REF = 188;
+
 function loadSprites() {
   const jobs = [];
   for (const [charKey, def] of Object.entries(SPRITE_DEFS)) {
@@ -733,9 +743,13 @@ function loadSprites() {
             return c;
           };
           const a = make(false), b = make(true);
-          const k = def.scale || 1;                 /* native-res art: world
+          let k = def.scale || 1;                   /* native-res art: world
                                                        dims shrink, source
                                                        stays full detail */
+          if (charKey === 'ori') {                  /* normalise the two atlases */
+            const grp = frameKey.replace(/\d+$/, '');
+            if (ORI_OS[grp]) k *= ORI_OS_REF / ORI_OS[grp];
+          }
           const entry = { w: def.scale ? w * k : w, h: def.scale ? h * k : h,
                           smooth: !!def.scale };    /* exact fractions → 1:1 */
           if (def.facesLeft) { entry.right = b; entry.left = a; }
