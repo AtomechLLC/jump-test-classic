@@ -388,48 +388,49 @@ if (rising && !jumpHeld)
     name: 'Keen', game: 'Commander Keen', accent: '#3f9e4a',
     hitboxW: 12,
     defaults: {
-      /* Keen Galaxy (Keen 4-6), sourced from Omnispeak / KeenWiki.
-         Raw: 256 map-units = 1 tile, 70 Hz; jump velY -40 held 18 tics,
-         pogo velY -48 held 24 tics, gravity 2 units/tic². A direct
-         velocity conversion under-predicts because the rise is
-         timer-sustained, so these are anchored on the OBSERVED heights
-         (normal jump ~3 tiles, pogo ~6 tiles) at firm gravity — which
-         also reproduces the sourced rise times (~18 and ~24 tics). */
+      /* Keen Galaxy (Keen 4-6), sourced from Omnispeak / KeenWiki and
+         converted DIRECTLY (256 map-units = 1 tile, 70 Hz → 60 Hz):
+         the jump is a TIMER, not a ballistic arc — leave the ground
+         instantly and ascend at constant speed while the button is held
+         and the timer runs (no gravity!), then gravity takes over.
+         velY 40 units/tic → 2.917 px-frame; 18 tics → 15 frames;
+         gravity 2 units/tic² → 0.170 px-frame²; pogo velY 48 → 3.5. */
       walkSpeed: 1.8,         // instant on the ground (Galaxy: no ground momentum)
       airAccel: 0.25,         // ...but momentum in the air
-      jumpForce: 6.4,         // ~3 tiles; release while rising cuts it (fine gradation)
-      gravity: 0.43,          // firm — not floaty
+      ascentSpeed: 2.917,     // constant while held + timer running
+      sustainFrames: 15,      // the jump timer (18 tics)
+      gravity: 0.17,          // takes over on release or expiry
       terminal: 10,
-      pogoForce: 8.3,         // auto-bounce ~5 tiles
-      pogoHighForce: 9.1,     // ~6 tiles, if you press jump ON the landing
-      pogoWindow: 7,          // frames a jump press still counts as "on the landing"
+      pogoSpeed: 3.5,         // pogo ascent (velY 48)
+      pogoSustain: 18,        // its timer — only counts down while jump is held
     },
     sliders: [
-      { key: 'jumpForce',     label: 'Jump force',        min: 3, max: 10, step: 0.1 },
-      { key: 'pogoForce',     label: 'Pogo bounce',       min: 4, max: 12, step: 0.1 },
-      { key: 'pogoHighForce', label: 'Pogo high bounce',  min: 4, max: 13, step: 0.1 },
-      { key: 'gravity',       label: 'Gravity',           min: 0.15, max: 0.8, step: 0.01 },
-      { key: 'walkSpeed',     label: 'Walk speed',        min: 0.5, max: 3.5, step: 0.05 },
+      { key: 'ascentSpeed',   label: 'Ascent speed',       min: 1, max: 5, step: 0.05 },
+      { key: 'sustainFrames', label: 'Jump timer (frames)', min: 0, max: 30, step: 1 },
+      { key: 'gravity',       label: 'Gravity',            min: 0.05, max: 0.5, step: 0.005 },
+      { key: 'pogoSpeed',     label: 'Pogo speed',         min: 1.5, max: 6, step: 0.05 },
+      { key: 'pogoSustain',   label: 'Pogo timer (frames)', min: 0, max: 30, step: 1 },
     ],
     explainer: `
       <h2>The Commander Keen Jump</h2>
-      <p>The plain jump is ordinary — variable height, release to cut,
-      with famously fine control. The distinctive part is the
-      <b>pogo</b>: tap <kbd>Shift</kbd> to hop on it and Keen bounces
-      <i>continuously and automatically</i>, carrying his momentum so he
-      glide-bounces instead of hop-and-stopping. Every bounce is big —
-      no tiny hops.</p>
-      <p class="rule"><b>The twist: a spring you play in time.</b> Press
-      <kbd>Space</kbd> right as Keen lands and the next bounce is taller
-      — the timed high-bounce that reaches secret ledges. Tap
-      <kbd>Shift</kbd> again to step off.</p>`,
+      <p>Keen 1 charged its jump on the ground: hold to squat, and the
+      launch scaled with the squat — precise, but you paused before every
+      hop (an identity Jump King later built a whole game on). Keen 4
+      swapped it for a <b>timer</b>: you leave the ground instantly and
+      ascend at <i>constant speed</i> while the button is held and the
+      timer runs — no gravity at all — then gravity takes over on release
+      or expiry. The rise looks flat because it <i>is</i> flat.</p>
+      <p class="rule"><b>The twist: the pogo.</b> Tap <kbd>Shift</kbd> and
+      Keen auto-bounces (~2 tiles), carrying his momentum. Hold
+      <kbd>Space</kbd> through a bounce and the same sustain timer
+      stretches it to ~6 tiles. Tap <kbd>Shift</kbd> to step off.</p>`,
     pseudocode:
-`<span class="hl">Shift: toggle pogo (auto-bounce)</span>
-onLand &amp;&amp; pogo:
-  yVel = pressedJumpOnLanding
-       ? -9.1   <span class="hl">// timed high bounce</span>
-       : -8.3   <span class="hl">// normal bounce</span>
-else (no pogo): normal jump, release to cut`,
+`<span class="hl">if (rising && jumpHeld && timer > 0)
+      timer--          // NO gravity: the
+                       // flat, constant climb</span>
+else  yVelocity -= 0.17 <span class="hl">// gravity takes over</span>
+<span class="hl">Shift: pogo — auto-bounce at -3.5;
+same timer, held through the bounce</span>`,
   },
 };
 
@@ -778,7 +779,7 @@ function newPlayerState(x) {
            jumpsUsed: 0, oriAnim: 'skip', oriT: 0, chainStage: 0, chainTimer: 0,
            lastChainStage: 0, sustain: 0, dashTime: 0, fallTime: 0,
            runHeld: false, spitAnim: 0, spitFx: null,
-           pogo: false, pogoPress: 0, pogoBounce: 0,
+           pogo: false, pogoBounce: 0, jumpTimer: 0,
            takeoffX: x, takeoffY: GROUND };
 }
 
@@ -805,19 +806,17 @@ function stepPhysics(st, charKey, P, input) {
     if (st.chainTimer === 0) st.chainStage = 0;
   }
 
-  /* Keen: the run button toggles the pogo; a jump press near a landing
-     arms the timed high bounce */
+  /* Keen: the run button toggles the pogo */
   if (charKey === 'keen') {
     if (input.run && !st.runHeld) {
       st.pogo = !st.pogo;
       if (st.pogo && st.grounded) {        /* hop straight onto it */
-        st.vy = -P.pogoForce; st.grounded = false; st.jumping = true;
+        st.vy = -P.pogoSpeed; st.jumpTimer = P.pogoSustain;
+        st.grounded = false; st.jumping = true;
         st.takeoffX = st.x; st.takeoffY = st.y; ev.jumped = true;
       }
     }
     st.runHeld = input.run;
-    if (input.jumpPressed) st.pogoPress = P.pogoWindow;
-    else if (st.pogoPress > 0) st.pogoPress--;
   }
 
   /* jump start — directly, via a buffered early press, or via coyote time */
@@ -840,6 +839,10 @@ function stepPhysics(st, charKey, P, input) {
       st.holdG = P.holdGravity;
       st.fallG = P.releaseGravity;
       st.sprintJump = Math.abs(st.vx) >= P.maxRun + 0.05;
+    } else if (charKey === 'keen') {
+      /* Keen 4: instant takeoff, constant-speed ascent under a timer */
+      st.vy = -P.ascentSpeed;
+      st.jumpTimer = P.sustainFrames;
     } else {
       st.vy = -P.jumpForce;
       if (charKey === 'metroid') st.spinJump = Math.abs(st.vx) > 0.2;
@@ -882,9 +885,6 @@ function stepPhysics(st, charKey, P, input) {
       st.jumping && !input.jumpHeld && st.vy < 0)
     st.vy = 0;
 
-  /* Keen's normal jump cuts the same way (the pogo bounce does not) */
-  if (charKey === 'keen' && !st.pogo && st.jumping && !input.jumpHeld && st.vy < 0)
-    st.vy = 0;
 
   /* (Kirby has no jump cut — the first jump's height is fixed; variable
      height comes entirely from flaps and the float) */
@@ -1092,10 +1092,11 @@ function stepPhysics(st, charKey, P, input) {
 
     if (onGround) {
       if (charKey === 'keen' && st.pogo) {
-        /* the pogo never rests — it launches straight back up (taller if
-           you pressed jump on the landing); each bounce is its own arc */
-        st.vy = -(st.pogoPress > 0 ? P.pogoHighForce : P.pogoForce);
-        st.pogoPress = 0; st.jumping = true; st.pogoBounce++;
+        /* the pogo never rests — it launches straight back up; its
+           sustain timer only counts down while jump is held, so an
+           unheld bounce is ~2 tiles and a held one ~6 */
+        st.vy = -P.pogoSpeed; st.jumpTimer = P.pogoSustain;
+        st.jumping = true; st.pogoBounce++;
         st.takeoffX = st.x; st.takeoffY = st.y; ev.jumped = true;
       } else {
         if (!st.grounded) ev.landed = true;
@@ -1126,6 +1127,17 @@ function stepPhysics(st, charKey, P, input) {
       if (st.vy >= 0) st.sustain = 0;
       if (st.vy > P.terminal) st.vy = P.terminal;
       st.oriT = (st.oriT || 0) + 1;      /* advance the air sequence */
+    } else if (charKey === 'keen') {
+      /* the Keen 4 timer: while rising, held, and the timer runs, NO
+         gravity — a constant-speed climb. Release zeroes the timer
+         ("timer set to 0"); then gravity takes over. */
+      if (st.vy < 0 && input.jumpHeld && st.jumpTimer > 0) {
+        st.jumpTimer--;
+      } else {
+        st.jumpTimer = 0;
+        st.vy += P.gravity;
+      }
+      if (st.vy > P.terminal) st.vy = P.terminal;
     } else if (charKey === 'kirby') {
       if (st.floating) {
         st.vy += P.floatGravity;         /* puffed: parachute drift */
@@ -1239,10 +1251,10 @@ function demoInput() {
       }
       demo.timer++;
       if (charKey === 'keen') {
-        /* mounted the pogo — bounce across, arming a timed high bounce
-           each landing, then settle in to admire */
+        /* mounted the pogo — a small unheld bounce first, then hold
+           jump through the next ones so the sustain stretches them */
         if (player.pogoBounce >= 4) { demo.phase = 'admire'; demo.timer = 120; return idle; }
-        return { dir: 1, run: true, jumpHeld: false, jumpPressed: player.vy > 5 };
+        return { dir: 1, run: false, jumpHeld: player.pogoBounce >= 1, jumpPressed: false };
       }
       const flap = charKey === 'kirby' && demo.flutterDone &&
                    demo.timer > 10 && demo.timer < 150 && player.vy > 0.4;
