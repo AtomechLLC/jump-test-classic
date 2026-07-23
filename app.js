@@ -388,49 +388,58 @@ if (rising && !jumpHeld)
     name: 'Keen', game: 'Commander Keen', accent: '#3f9e4a',
     hitboxW: 12,
     defaults: {
-      /* Keen Galaxy (Keen 4-6), sourced from Omnispeak / KeenWiki and
-         converted DIRECTLY (256 map-units = 1 tile, 70 Hz → 60 Hz):
-         the jump is a TIMER, not a ballistic arc — leave the ground
-         instantly and ascend at constant speed while the button is held
-         and the timer runs (no gravity!), then gravity takes over.
-         velY 40 units/tic → 2.917 px-frame; 18 tics → 15 frames;
-         gravity 2 units/tic² → 0.170 px-frame²; pogo velY 48 → 3.5. */
-      walkSpeed: 1.8,         // instant on the ground (Galaxy: no ground momentum)
+      /* Two jump models in one character, per the Keen 1 vs 4 breakdown.
+         Keen 1 (default, measured from captured footage at 60 fps): hold
+         to SQUAT in place ~16 frames; release early for a smaller launch,
+         hold to completion for the full one — impulse + gravity, a real
+         parabola. Measured: small hop 2.83 tiles, full 4.12, squat pause
+         ~0.28 s, gravity ≈ 0.17 px/f².
+         Keen 4 (model slider → 1, sourced from Omnispeak/KeenWiki,
+         256 units = 1 tile, 70→60 Hz): instant takeoff, constant ascent
+         (velY 40 → 2.917 px/f) while held and the 18-tic (15-frame)
+         timer runs — gravity suspended — then gravity takes over. */
+      model: 0,               // 0 = Keen 1 squat-charge · 1 = Keen 4 timer
+      walkSpeed: 1.8,         // instant on the ground
       airAccel: 0.25,         // ...but momentum in the air
-      ascentSpeed: 2.917,     // constant while held + timer running
-      sustainFrames: 15,      // the jump timer (18 tics)
-      gravity: 0.17,          // takes over on release or expiry
+      squatFrames: 16,        // Keen 1: squat length (auto-launch when done)
+      chargeMinJump: 3.75,    // Keen 1: instant-release launch (~2.8 tiles)
+      chargeMaxJump: 4.6,     // Keen 1: full-squat launch (~4.1 tiles)
+      ascentSpeed: 2.917,     // Keen 4: constant while held + timer running
+      sustainFrames: 15,      // Keen 4: the jump timer (18 tics)
+      gravity: 0.17,          // both models (measured ≈ sourced!)
       terminal: 10,
       pogoSpeed: 3.5,         // pogo ascent (velY 48)
       pogoSustain: 18,        // its timer — only counts down while jump is held
     },
     sliders: [
-      { key: 'ascentSpeed',   label: 'Ascent speed',       min: 1, max: 5, step: 0.05 },
-      { key: 'sustainFrames', label: 'Jump timer (frames)', min: 0, max: 30, step: 1 },
+      { key: 'model',         label: 'Model (0=Keen1 · 1=Keen4)', min: 0, max: 1, step: 1 },
+      { key: 'squatFrames',   label: 'K1 squat (frames)',  min: 2, max: 30, step: 1 },
+      { key: 'chargeMaxJump', label: 'K1 full launch',     min: 3, max: 7, step: 0.05 },
+      { key: 'ascentSpeed',   label: 'K4 ascent speed',    min: 1, max: 5, step: 0.05 },
+      { key: 'sustainFrames', label: 'K4 timer (frames)',  min: 0, max: 30, step: 1 },
       { key: 'gravity',       label: 'Gravity',            min: 0.05, max: 0.5, step: 0.005 },
-      { key: 'pogoSpeed',     label: 'Pogo speed',         min: 1.5, max: 6, step: 0.05 },
-      { key: 'pogoSustain',   label: 'Pogo timer (frames)', min: 0, max: 30, step: 1 },
     ],
     explainer: `
       <h2>The Commander Keen Jump</h2>
-      <p>Keen 1 charged its jump on the ground: hold to squat, and the
-      launch scaled with the squat — precise, but you paused before every
-      hop (an identity Jump King later built a whole game on). Keen 4
-      swapped it for a <b>timer</b>: you leave the ground instantly and
-      ascend at <i>constant speed</i> while the button is held and the
-      timer runs — no gravity at all — then gravity takes over on release
-      or expiry. The rise looks flat because it <i>is</i> flat.</p>
+      <p><b>Keen 1</b> charges on the ground: hold jump and Keen squats in
+      place (~0.28 s); release early for a small hop, hold to completion
+      and he auto-launches the full jump — a true parabola, launch scaled
+      by the squat. Precise and smooth, but you pause before every hop —
+      an identity Jump King later built a whole game on. <b>Keen 4</b>
+      (flip the model slider) leaves the ground instantly and climbs at
+      <i>constant speed</i> while held and a timer runs — no gravity — so
+      the rise is literally flat.</p>
       <p class="rule"><b>The twist: the pogo.</b> Tap <kbd>Shift</kbd> and
-      Keen auto-bounces (~2 tiles), carrying his momentum. Hold
-      <kbd>Space</kbd> through a bounce and the same sustain timer
-      stretches it to ~6 tiles. Tap <kbd>Shift</kbd> to step off.</p>`,
+      Keen auto-bounces (~2 tiles), carrying his momentum; hold
+      <kbd>Space</kbd> through a bounce to stretch it to ~6 tiles. Tap
+      <kbd>Shift</kbd> to step off.</p>`,
     pseudocode:
-`<span class="hl">if (rising && jumpHeld && timer > 0)
-      timer--          // NO gravity: the
-                       // flat, constant climb</span>
-else  yVelocity -= 0.17 <span class="hl">// gravity takes over</span>
-<span class="hl">Shift: pogo — auto-bounce at -3.5;
-same timer, held through the bounce</span>`,
+`<span class="hl">Keen 1: hold → squat++ (stay grounded)
+release/done → vy = lerp(3.9, 4.7,
+                    squat/16), then gravity</span>
+Keen 4: instant; while held &amp; timer:
+      <span class="hl">NO gravity — the flat climb</span>
+Shift: pogo — bounce -3.5, same sustain`,
   },
 };
 
@@ -523,7 +532,8 @@ const SPRITE_DEFS = {
   /* Keen ships as inline pixel art (no owned game files to rip from) —
      these maps ARE the sprites, like Ori's original placeholder. */
   keen: { inline: true, facesLeft: false, frames: {
-    idle: 1, walk1: 1, walk2: 1, jump: 1, fall: 1, pogo1: 1, pogo2: 1 } },
+    idle: 1, walk1: 1, walk2: 1, jump: 1, fall: 1, pogo1: 1, pogo2: 1,
+    squat: 1 } },
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
@@ -682,6 +692,10 @@ FALLBACK_MAPS.keen = {
     '...rrrrrrrr...', '..rrrrrrrrrr..', '....bbbbbb....', '.....bbbb.....',
     '......bb......', '......kk......', '......kk......', '......kk......',
     '.....kkkk.....', '......kk......', '....wwkkww....'],
+  squat: [
+    '....hhhhhh....', '...hhhhhhhh...', '..hhhhhhhhhh..', '..hwwwwwwwwh..',
+    '...ssssssss...', '...sssskssss..', '...rrrrrrrr...', '..rrrrrrrrrr..',
+    '..bbbbbbbbbb..', '..bbb....bbb..', '.rrr......rrr.'],
 };
 
 /* frameKey → fallback pixel map, per character */
@@ -779,7 +793,7 @@ function newPlayerState(x) {
            jumpsUsed: 0, oriAnim: 'skip', oriT: 0, chainStage: 0, chainTimer: 0,
            lastChainStage: 0, sustain: 0, dashTime: 0, fallTime: 0,
            runHeld: false, spitAnim: 0, spitFx: null,
-           pogo: false, pogoBounce: 0, jumpTimer: 0,
+           pogo: false, pogoBounce: 0, jumpTimer: 0, squatT: -1,
            takeoffX: x, takeoffY: GROUND };
 }
 
@@ -810,6 +824,7 @@ function stepPhysics(st, charKey, P, input) {
   if (charKey === 'keen') {
     if (input.run && !st.runHeld) {
       st.pogo = !st.pogo;
+      st.squatT = -1;                      /* mounting cancels a squat */
       if (st.pogo && st.grounded) {        /* hop straight onto it */
         st.vy = -P.pogoSpeed; st.jumpTimer = P.pogoSustain;
         st.grounded = false; st.jumping = true;
@@ -817,14 +832,35 @@ function stepPhysics(st, charKey, P, input) {
       }
     }
     st.runHeld = input.run;
+
+    /* Keen 1 squat-charge: hold to squat in place; release early for a
+       smaller launch, or let the squat complete for the full jump */
+    if (P.model < 1 && !st.pogo) {
+      if (st.grounded && input.jumpPressed && st.squatT < 0)
+        st.squatT = 0;                     /* start squatting */
+      if (st.squatT >= 0) {
+        if (input.jumpHeld && st.squatT < P.squatFrames) {
+          st.squatT++;                     /* charging — stays grounded */
+        }
+        if (!input.jumpHeld || st.squatT >= P.squatFrames) {
+          const t = Math.min(st.squatT, P.squatFrames) / P.squatFrames;
+          st.vy = -(P.chargeMinJump + (P.chargeMaxJump - P.chargeMinJump) * t);
+          st.squatT = -1;
+          st.grounded = false; st.jumping = true;
+          st.takeoffX = st.x; st.takeoffY = st.y; ev.jumped = true;
+        }
+      }
+    } else st.squatT = -1;
   }
 
   /* jump start — directly, via a buffered early press, or via coyote time */
   const buffered = ASSISTS.buffer && st.grounded && st.jumpBuffer > 0;
   const coyote = ASSISTS.coyote && !st.grounded && !st.jumping &&
                  st.coyoteTimer > 0 && input.jumpPressed;
-  const keenBounceMode = charKey === 'keen' && st.pogo;   /* bounce is auto, on landing */
-  if (!keenBounceMode && ((st.grounded && (input.jumpPressed || buffered)) || coyote)) {
+  /* Keen handles its own takeoffs: pogo bounces on landing, and the
+     Keen 1 squat launches from its own charge logic above */
+  const keenCustom = charKey === 'keen' && (st.pogo || P.model < 1);
+  if (!keenCustom && ((st.grounded && (input.jumpPressed || buffered)) || coyote)) {
     ev.assist = coyote ? 'coyote time!'
       : (buffered && !input.jumpPressed ? 'buffered!' : null);
     st.jumpBuffer = 0; st.coyoteTimer = 0;
@@ -1019,7 +1055,8 @@ function stepPhysics(st, charKey, P, input) {
       ? (st.dashTime || 0) + 1 : 0;
   } else if (charKey === 'keen') {
     if (st.grounded) {
-      st.vx = input.dir * P.walkSpeed;     /* Galaxy: instant, no ground momentum */
+      /* instant on the ground — but a Keen 1 squat locks you in place */
+      st.vx = st.squatT >= 0 ? 0 : input.dir * P.walkSpeed;
     } else if (input.dir !== 0) {          /* ...but momentum in the air */
       st.vx += input.dir * P.airAccel;
       if (Math.abs(st.vx) > P.walkSpeed) st.vx = Math.sign(st.vx) * P.walkSpeed;
@@ -1128,10 +1165,13 @@ function stepPhysics(st, charKey, P, input) {
       if (st.vy > P.terminal) st.vy = P.terminal;
       st.oriT = (st.oriT || 0) + 1;      /* advance the air sequence */
     } else if (charKey === 'keen') {
-      /* the Keen 4 timer: while rising, held, and the timer runs, NO
-         gravity — a constant-speed climb. Release zeroes the timer
-         ("timer set to 0"); then gravity takes over. */
-      if (st.vy < 0 && input.jumpHeld && st.jumpTimer > 0) {
+      /* Keen 1 jump (model 0, off the pogo): plain ballistic — the whole
+         decision was made in the squat. Keen 4 (model 1, and the pogo in
+         both): while rising, held, and the timer runs, NO gravity — a
+         constant-speed climb; release zeroes the timer, gravity takes
+         over. */
+      const timered = P.model >= 1 || st.pogo;
+      if (timered && st.vy < 0 && input.jumpHeld && st.jumpTimer > 0) {
         st.jumpTimer--;
       } else {
         st.jumpTimer = 0;
@@ -1212,7 +1252,7 @@ function startDemo() {
   player = newPlayerState(70);
   arc = []; lastArc = []; ghosts = [];
   demo.phase = 'wait'; demo.timer = 30; demo.flutterDone = false;
-  demo.chainCount = 0;
+  demo.chainCount = 0; demo.keenStep = 0;
 }
 
 function stopDemo() { demo.phase = 'off'; }
@@ -1228,12 +1268,13 @@ function demoInput() {
       if (player.grounded && player.x >= DEMO_JUMP_X[charKey]) {
         demo.phase = 'air';
         demo.timer = 0;
-        if (charKey === 'keen') return { ...move, run: true };   /* hop onto the pogo */
         return { ...move, jumpHeld: true, jumpPressed: true };
       }
       return move;
     case 'air': {
-      if (player.grounded) {
+      /* Keen runs its own multi-act sequence below (squats keep him
+         grounded, so the landed-check would end the act too early) */
+      if (player.grounded && charKey !== 'keen') {
         if (charKey === 'kirby' && !demo.flutterDone) {
           /* Kirby's showcase, act two: jump again and spam flaps to flutter */
           demo.flutterDone = true;
@@ -1251,10 +1292,26 @@ function demoInput() {
       }
       demo.timer++;
       if (charKey === 'keen') {
-        /* mounted the pogo — a small unheld bounce first, then hold
-           jump through the next ones so the sustain stretches them */
-        if (player.pogoBounce >= 4) { demo.phase = 'admire'; demo.timer = 120; return idle; }
-        return { dir: 1, run: false, jumpHeld: player.pogoBounce >= 1, jumpPressed: false };
+        /* act one: tap → small hop. act two: hold through the squat →
+           the full jump. act three: pogo, held bounces. */
+        const landed = player.grounded && !player.jumping && player.squatT < 0;
+        if (demo.keenStep === 0) {
+          if (landed && demo.timer > 10) {
+            demo.keenStep = 1;
+            return { dir: 0, run: false, jumpHeld: true, jumpPressed: true };
+          }
+          return { dir: 0, run: false, jumpHeld: demo.timer < 2, jumpPressed: false };
+        }
+        if (demo.keenStep === 1) {
+          if (landed && demo.timer > 80) {
+            demo.keenStep = 2;
+            return { dir: 1, run: true, jumpHeld: false, jumpPressed: false };
+          }
+          return { dir: 0, run: false,
+                   jumpHeld: player.squatT >= 0 || player.vy < 0, jumpPressed: false };
+        }
+        if (player.pogoBounce >= 3) { demo.phase = 'admire'; demo.timer = 120; return idle; }
+        return { dir: 1, run: false, jumpHeld: true, jumpPressed: false };
       }
       const flap = charKey === 'kirby' && demo.flutterDone &&
                    demo.timer > 10 && demo.timer < 150 && player.vy > 0.4;
@@ -1561,6 +1618,7 @@ function spriteFrameKey() {
     }
     return player.jumping ? 'jump' : 'idle';
   }
+  if (charKey === 'keen' && player.squatT >= 0) return 'squat';
   if (speed > 0.05) {
     if (charKey === 'metroid') {
       const d = Math.max(2, Math.round(5 - speed * 0.6));

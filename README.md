@@ -72,14 +72,16 @@ what the original games do) — and differ in what happens around the button:
   the sequence escalates skip → hop → spinning flip, with jump heights
   3 → 3.75 → 4.5 (from the SeinJump source). Miss the window and it
   resets. Soft-gravity while held, plus one mid-air Double Jump.
-- **Commander Keen (Keen)** — the sixth answer: a timer. Keen 4 dropped
-  Keen 1's squat-charge (hold to crouch, launch scaled by the hold — the
-  identity Jump King later built a game on) for instant takeoff at
-  *constant ascent speed* while the button is held and a timer runs — no
-  gravity during the climb, so the rise is literally flat. Tap
+- **Commander Keen (Keen)** — the sixth answer: charge it on the ground.
+  Keen 1 (the default model): hold jump and Keen *squats* in place; release
+  early for a small hop, hold ~0.27 s to completion and he auto-launches
+  the full jump — launch velocity scaled by the squat, a true parabola,
+  and the pause before every hop is the mechanical identity Jump King
+  later built a whole game on. Flip the model slider for Keen 4's
+  replacement: instant takeoff at *constant ascent speed* under a timer —
+  no gravity during the climb, a literally flat rise. Tap
   <kbd>Shift</kbd> for the *pogo*: continuous momentum-carrying
-  auto-bounces (~2 tiles) that the same sustain timer stretches to ~6
-  when you hold jump through them.
+  auto-bounces (~2 tiles) stretched to ~6 by holding jump through them.
 
 ## Game-feel assists
 
@@ -187,28 +189,33 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   Jump force, both serialized in scene data rather than code.
   A pixel-art placeholder remains as the
   fallback. Ori is © Microsoft / Moon Studios.
-- **Commander Keen** (Keen 4-6, "Galaxy"): the jump is modeled as what it
-  actually is — a *timer*, not a ballistic arc. Keen leaves the ground
-  instantly and ascends at constant speed while the button is held and
-  the jump timer runs (gravity is suspended entirely), then gravity takes
-  over on release ("timer set to 0") or expiry; the rise is flat because
-  it is flat. With the correct mechanism the
+- **Commander Keen**: two jump models in one tab, per the Keen 1 vs 4
+  comparison. **Keen 1** (default) is measured frame-by-frame from
+  captured gameplay footage with an on-screen input display (the CTRL
+  indicator gives exact hold timings): holding jump squats Keen in place
+  ~16 frames (~0.27 s) before auto-launching; releasing early launches
+  immediately at reduced force. Measured: short-hold hop 2.83 tiles
+  (47-frame airtime), full jump 4.12 tiles (57 frames, takeoff ~17
+  frames after the press), decelerating ballistic ascent with gravity
+  ≈ 0.17 px-frame² — which happens to equal Keen 4's sourced constant.
+  The sim reproduces 2.86 / 4.03 tiles with matching timings; the charge
+  is modeled as a smooth lerp (3.75 → 4.6 px-frame over the squat) where
+  the original quantized to its squat animation poses. **Keen 4** (model
+  slider → 1) is the *timer*: instant takeoff, constant ascent while held
+  and the timer runs (gravity suspended — the rise is literally flat),
+  gravity on release or expiry. Sourced from
   [Omnispeak](https://github.com/sulix/omnispeak) /
   [KeenWiki](https://keenwiki.shikadi.net/wiki/Patch:Keen_(Keen_4))
-  constants convert directly (256 map-units = 1 tile, 70 Hz → 60 Hz):
-  jump velY 40 units/tic → 2.917 px-frame ascent, jumpTimer 18 tics →
-  15 frames, gravity 2 units/tic² → 0.170 px-frame², pogo velY 48 →
-  3.5 px-frame. Full jump ≈ 4.3 tiles (flat climb plus a short ballistic
-  tail). The pogo is a toggled continuous momentum-carrying auto-bounce
-  whose sustain timer only counts down while jump is held: unheld ≈ 2
-  tiles, held ≈ 6 — matching the documented min/max pogo heights. Keen
-  1's squat-charge jump (hold to crouch, force scales with the hold) is
-  described in the explainer as the design it replaced. Ground movement
-  is Galaxy-style: instant (no ground momentum), momentum only in the
-  air. *Approximated:* terminal fall speed, walk/air-accel constants, and
-  the pogo timer (18 frames vs the raw 24 tics ≈ 20.6, trimmed to hit the
-  ~6-tile held bounce). Keen ships as original placeholder pixel art (no
-  owned game files to rip); Commander Keen is © id Software / ZeniMax.
+  and converted directly (256 map-units = 1 tile, 70 Hz → 60 Hz): velY 40
+  units/tic → 2.917 px-frame, jumpTimer 18 tics → 15 frames, gravity 2
+  units/tic² → 0.170 px-frame², pogo velY 48 → 3.5 px-frame. The pogo is
+  a toggled continuous momentum-carrying auto-bounce whose sustain only
+  counts while jump is held: unheld ≈ 2 tiles, held ≈ 6, matching the
+  documented min/max. Ground movement is instant with momentum only in
+  the air. *Approximated:* terminal fall speed, walk/air-accel constants,
+  the pogo timer (18 frames vs the raw ≈ 20.6), and the continuous charge
+  curve. Keen ships as original placeholder pixel art (no owned game
+  files to rip); Commander Keen is © id Software / ZeniMax.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
