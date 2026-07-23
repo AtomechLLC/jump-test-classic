@@ -64,12 +64,22 @@ function wakeAudio() {
   }
   if (actx.state === 'suspended') actx.resume();
 }
+const pendingSfx = [];
 function sfx(name, delay = 0) {
   if (!soundOn || !actx || !BUF[name]) return;
   const s = actx.createBufferSource();
   s.buffer = BUF[name];
   s.connect(actx.destination);
   s.start(actx.currentTime + Math.max(0, delay));
+  pendingSfx.push(s);
+  s.onended = () => { const i = pendingSfx.indexOf(s); if (i >= 0) pendingSfx.splice(i, 1); };
+}
+function resetAttack() {
+  base = null;
+  fx.length = 0;
+  shakeOn = false;
+  for (const s of pendingSfx) { try { s.stop(); } catch (e) {} }
+  pendingSfx.length = 0;
 }
 
 /* ---- playback state ---- */
@@ -87,7 +97,8 @@ function idxOf(c, start, t) { return Math.floor((t - start) * c.fps) + c.press; 
 /* ---- triggers ---- */
 function fullAttack() {
   wakeAudio();
-  if (!ready || base) return;
+  if (!ready) return;
+  if (base) resetAttack();          // re-pressing Z restarts instead of waiting
   const t = now();
   attackT0 = t;
   const all = LAYERS.every(l => on[l.id]);
@@ -119,7 +130,7 @@ function fireSolo(i) {
   const id = LAYERS[i].id;
   const t = now();
   if (id === 'anim' || id === 'struck' || id === 'stop') {
-    if (base) return;
+    if (base) resetAttack();        // retrigger, like Animation.Play in the original
     attackT0 = t;
     base = { mode: 'solo', clip: id === 'anim' ? 'atk' : id === 'struck' ? 'struck' : 'hiccup' };
     baseStart = t;
