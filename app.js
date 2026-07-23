@@ -455,8 +455,8 @@ const SPRITE_DEFS = {
   /* Ori's frames ship at the game's native resolution and draw at 1:1
      screen pixels (scale = 1/SCALE). Every animation is the complete
      sequence from the game's atlas metadata, in authored order; the
-     native art faces left. Counts live in ORI_ANIM. */
-  ori: { facesLeft: true, scale: 1 / SCALE, frames: (() => {
+     native art faces right. Counts live in ORI_ANIM. */
+  ori: { facesLeft: false, scale: 1 / SCALE, frames: (() => {
     const f = {};
     for (const [p, n] of [['run', 60], ['idle', 40], ['fall', 36],
                           ['skip', 27], ['hop', 34], ['flip', 40], ['dj', 20]])
