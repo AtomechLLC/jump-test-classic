@@ -383,9 +383,57 @@ yVelocity -= 0.155 <span class="hl">// same both ways</span>
 if (rising && !jumpHeld)
       yVelocity -= 0.6 <span class="hl">// sustain cut</span>`,
   },
+
+  keen: {
+    name: 'Keen', game: 'Commander Keen', accent: '#3f9e4a',
+    hitboxW: 12,
+    defaults: {
+      /* Keen Galaxy (Keen 4-6), sourced from Omnispeak / KeenWiki.
+         Raw: 256 map-units = 1 tile, 70 Hz; jump velY -40 held 18 tics,
+         pogo velY -48 held 24 tics, gravity 2 units/tic². A direct
+         velocity conversion under-predicts because the rise is
+         timer-sustained, so these are anchored on the OBSERVED heights
+         (normal jump ~3 tiles, pogo ~6 tiles) at firm gravity — which
+         also reproduces the sourced rise times (~18 and ~24 tics). */
+      walkSpeed: 1.8,         // instant on the ground (Galaxy: no ground momentum)
+      airAccel: 0.25,         // ...but momentum in the air
+      jumpForce: 6.4,         // ~3 tiles; release while rising cuts it (fine gradation)
+      gravity: 0.43,          // firm — not floaty
+      terminal: 10,
+      pogoForce: 8.3,         // auto-bounce ~5 tiles
+      pogoHighForce: 9.1,     // ~6 tiles, if you press jump ON the landing
+      pogoWindow: 7,          // frames a jump press still counts as "on the landing"
+    },
+    sliders: [
+      { key: 'jumpForce',     label: 'Jump force',        min: 3, max: 10, step: 0.1 },
+      { key: 'pogoForce',     label: 'Pogo bounce',       min: 4, max: 12, step: 0.1 },
+      { key: 'pogoHighForce', label: 'Pogo high bounce',  min: 4, max: 13, step: 0.1 },
+      { key: 'gravity',       label: 'Gravity',           min: 0.15, max: 0.8, step: 0.01 },
+      { key: 'walkSpeed',     label: 'Walk speed',        min: 0.5, max: 3.5, step: 0.05 },
+    ],
+    explainer: `
+      <h2>The Commander Keen Jump</h2>
+      <p>The plain jump is ordinary — variable height, release to cut,
+      with famously fine control. The distinctive part is the
+      <b>pogo</b>: tap <kbd>Shift</kbd> to hop on it and Keen bounces
+      <i>continuously and automatically</i>, carrying his momentum so he
+      glide-bounces instead of hop-and-stopping. Every bounce is big —
+      no tiny hops.</p>
+      <p class="rule"><b>The twist: a spring you play in time.</b> Press
+      <kbd>Space</kbd> right as Keen lands and the next bounce is taller
+      — the timed high-bounce that reaches secret ledges. Tap
+      <kbd>Shift</kbd> again to step off.</p>`,
+    pseudocode:
+`<span class="hl">Shift: toggle pogo (auto-bounce)</span>
+onLand &amp;&amp; pogo:
+  yVel = pressedJumpOnLanding
+       ? -9.1   <span class="hl">// timed high bounce</span>
+       : -8.3   <span class="hl">// normal bounce</span>
+else (no pogo): normal jump, release to cut`,
+  },
 };
 
-const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx', 'kirby', 'ori'];
+const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx', 'kirby', 'ori', 'keen'];
 
 /* ---- modern game-feel assists (toggleable, applied to every character) ---- */
 const COYOTE_FRAMES = 6;   // grace window after walking off a ledge
@@ -471,6 +519,10 @@ const SPRITE_DEFS = {
     frun4: 'sonic_run4',
     ball1: 'sonic_ball1', ball2: 'sonic_ball2', ball3: 'sonic_ball3',
     ball4: 'sonic_ball4' } },
+  /* Keen ships as inline pixel art (no owned game files to rip from) —
+     these maps ARE the sprites, like Ori's original placeholder. */
+  keen: { inline: true, facesLeft: false, frames: {
+    idle: 1, walk1: 1, walk2: 1, jump: 1, fall: 1, pogo1: 1, pogo2: 1 } },
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
@@ -587,6 +639,50 @@ FALLBACK_MAPS.ori = {
     '...oosssoo......', '.....oooo.......'],
 };
 
+/* Commander Keen: gold helmet + white stripe, red shirt, blue jeans, red
+   sneakers, and a pogo stick (k) for the pogo poses. Original placeholder
+   pixel art — swap in ripped EGA sprites later. */
+FALLBACK_PALETTES.keen = { h: '#d8b828', w: '#ffffff', s: '#f0c8a0',
+  r: '#d83028', b: '#2848c8', k: '#282828' };
+FALLBACK_MAPS.keen = {
+  idle: [
+    '....hhhhhh....', '...hhhhhhhh...', '..hhhhhhhhhh..', '..hwwwwwwwwh..',
+    '...ssssssss...', '...sssskssss..', '...ssssssss...', '....rrrrrr....',
+    '...rrrrrrrr...', '..rrrrrrrrrr..', '..r.rrrrrr.r..', '....bbbbbb....',
+    '...bbb..bbb...', '...bb....bb...', '..rrr....rrr..'],
+  walk1: [
+    '....hhhhhh....', '...hhhhhhhh...', '..hhhhhhhhhh..', '..hwwwwwwwwh..',
+    '...ssssssss...', '...sssskssss..', '...ssssssss...', '....rrrrrr....',
+    '...rrrrrrrr...', '..rrrrrrrrrr..', '..r.rrrrrr.r..', '....bbbbbb....',
+    '...bbb..bbb...', '..bb......bb..', '.rrr......rrr.'],
+  walk2: [
+    '....hhhhhh....', '...hhhhhhhh...', '..hhhhhhhhhh..', '..hwwwwwwwwh..',
+    '...ssssssss...', '...sssskssss..', '...ssssssss...', '....rrrrrr....',
+    '...rrrrrrrr...', '..rrrrrrrrrr..', '..r.rrrrrr.r..', '....bbbbbb....',
+    '....bbbbbb....', '....bb.bb.....', '...rr..rr.....'],
+  jump: [
+    '..r.hhhhhh....', '..rrhhhhhhh...', '..rrhhhhhhhh..', '...hwwwwwwwwh.',
+    '...ssssssss...', '...sssskssss..', '..rrrrrrrr....', '..rrrrrrrrrr..',
+    '...rrrrrrrr...', '....bbbbbb....', '...bbb..bbb...', '..bb......bb..',
+    '.rr........rr.'],
+  fall: [
+    'r...hhhhhh...r', '.rr.hhhhhhh.rr', '..rrhhhhhhhrr.', '...hwwwwwwwwh.',
+    '...ssssssss...', '...sssskssss..', '...ssrrrrss...', '..rrrrrrrrrr..',
+    '...rrrrrrrr...', '....bbbbbb....', '...bb....bb...', '..bb......bb..',
+    '.rr........rr.'],
+  pogo1: [
+    '.....hhhhhh...', '....hhhhhhhh..', '...hhhhhhhhhh.', '...hwwwwwwwwh.',
+    '....ssssssss..', '....sssskss...', '....rrrrrrr...', '...rrrrrrrrr..',
+    '...rrrrrrrr...', '...bbbbbbbb...', '...bb....bb...', '...kkkkkkkk...',
+    '......kk......', '....wwkkww....'],
+  pogo2: [
+    '....hhhhhh....', '...hhhhhhhh...', '..hhhhhhhhhh..', '..hwwwwwwwwh..',
+    '...ssssssss...', '...sssskssss..', '...ssssssss...', '....rrrrrr....',
+    '...rrrrrrrr...', '..rrrrrrrrrr..', '....bbbbbb....', '.....bbbb.....',
+    '......bb......', '......kk......', '......kk......', '......kk......',
+    '.....kkkk.....', '......kk......', '....wwkkww....'],
+};
+
 /* frameKey → fallback pixel map, per character */
 function fallbackMapFor(charKey, frameKey) {
   const maps = FALLBACK_MAPS[charKey];
@@ -668,6 +764,7 @@ function newPlayerState(x) {
            jumpsUsed: 0, oriAnim: 'skip', oriT: 0, chainStage: 0, chainTimer: 0,
            lastChainStage: 0, sustain: 0, dashTime: 0, fallTime: 0,
            runHeld: false, spitAnim: 0, spitFx: null,
+           pogo: false, pogoPress: 0, pogoBounce: 0,
            takeoffX: x, takeoffY: GROUND };
 }
 
@@ -694,11 +791,27 @@ function stepPhysics(st, charKey, P, input) {
     if (st.chainTimer === 0) st.chainStage = 0;
   }
 
+  /* Keen: the run button toggles the pogo; a jump press near a landing
+     arms the timed high bounce */
+  if (charKey === 'keen') {
+    if (input.run && !st.runHeld) {
+      st.pogo = !st.pogo;
+      if (st.pogo && st.grounded) {        /* hop straight onto it */
+        st.vy = -P.pogoForce; st.grounded = false; st.jumping = true;
+        st.takeoffX = st.x; st.takeoffY = st.y; ev.jumped = true;
+      }
+    }
+    st.runHeld = input.run;
+    if (input.jumpPressed) st.pogoPress = P.pogoWindow;
+    else if (st.pogoPress > 0) st.pogoPress--;
+  }
+
   /* jump start — directly, via a buffered early press, or via coyote time */
   const buffered = ASSISTS.buffer && st.grounded && st.jumpBuffer > 0;
   const coyote = ASSISTS.coyote && !st.grounded && !st.jumping &&
                  st.coyoteTimer > 0 && input.jumpPressed;
-  if ((st.grounded && (input.jumpPressed || buffered)) || coyote) {
+  const keenBounceMode = charKey === 'keen' && st.pogo;   /* bounce is auto, on landing */
+  if (!keenBounceMode && ((st.grounded && (input.jumpPressed || buffered)) || coyote)) {
     ev.assist = coyote ? 'coyote time!'
       : (buffered && !input.jumpPressed ? 'buffered!' : null);
     st.jumpBuffer = 0; st.coyoteTimer = 0;
@@ -753,6 +866,10 @@ function stepPhysics(st, charKey, P, input) {
   /* Samus / Mega Man / X variable jump: release while rising → ascent ends */
   if ((charKey === 'metroid' || charKey === 'megaman' || charKey === 'megamanx') &&
       st.jumping && !input.jumpHeld && st.vy < 0)
+    st.vy = 0;
+
+  /* Keen's normal jump cuts the same way (the pogo bounce does not) */
+  if (charKey === 'keen' && !st.pogo && st.jumping && !input.jumpHeld && st.vy < 0)
     st.vy = 0;
 
   /* (Kirby has no jump cut — the first jump's height is fixed; variable
@@ -886,6 +1003,16 @@ function stepPhysics(st, charKey, P, input) {
     /* dash pose timing: the crouch-in frame, then the full stretch */
     st.dashTime = (st.grounded && Math.abs(st.vx) > P.walkSpeed + 0.05)
       ? (st.dashTime || 0) + 1 : 0;
+  } else if (charKey === 'keen') {
+    if (st.grounded) {
+      st.vx = input.dir * P.walkSpeed;     /* Galaxy: instant, no ground momentum */
+    } else if (input.dir !== 0) {          /* ...but momentum in the air */
+      st.vx += input.dir * P.airAccel;
+      if (Math.abs(st.vx) > P.walkSpeed) st.vx = Math.sign(st.vx) * P.walkSpeed;
+    } else {
+      st.vx *= 0.94;                       /* mild air drag with no input */
+      if (Math.abs(st.vx) < 0.05) st.vx = 0;
+    }
   } else { /* sonic */
     if (input.dir !== 0) {
       if (st.grounded && st.vx !== 0 && Math.sign(st.vx) !== input.dir) {
@@ -950,10 +1077,18 @@ function stepPhysics(st, charKey, P, input) {
     }
 
     if (onGround) {
-      if (!st.grounded) ev.landed = true;
-      if (!st.grounded && charKey === 'ori') st.chainTimer = P.chainWindow;
-      st.grounded = true; st.vy = 0; st.jumping = false; st.floating = false;
-      st.jumpsUsed = 0;
+      if (charKey === 'keen' && st.pogo) {
+        /* the pogo never rests — it launches straight back up (taller if
+           you pressed jump on the landing); each bounce is its own arc */
+        st.vy = -(st.pogoPress > 0 ? P.pogoHighForce : P.pogoForce);
+        st.pogoPress = 0; st.jumping = true; st.pogoBounce++;
+        st.takeoffX = st.x; st.takeoffY = st.y; ev.jumped = true;
+      } else {
+        if (!st.grounded) ev.landed = true;
+        if (!st.grounded && charKey === 'ori') st.chainTimer = P.chainWindow;
+        st.grounded = true; st.vy = 0; st.jumping = false; st.floating = false;
+        st.jumpsUsed = 0;
+      }
     } else if (st.grounded) {
       st.grounded = false;               /* walked off a ledge */
       st.coyoteTimer = COYOTE_FRAMES;
@@ -1044,7 +1179,7 @@ let jumpQueued = false;
 
 const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170,
                       metroid: 165, megaman: 180, megamanx: 165, kirby: 170,
-                      ori: 130 };
+                      ori: 130, keen: 120 };
 const demo = { phase: 'off', timer: 0, pinned: false, flutterDone: false };
 
 function startDemo() {
@@ -1058,7 +1193,7 @@ function stopDemo() { demo.phase = 'off'; }
 
 function demoInput() {
   const idle = { dir: 0, run: false, jumpHeld: false, jumpPressed: false };
-  const move = { dir: 1, run: charKey !== 'castlevania' && charKey !== 'sonic', jumpHeld: false, jumpPressed: false };
+  const move = { dir: 1, run: charKey !== 'castlevania' && charKey !== 'sonic' && charKey !== 'keen', jumpHeld: false, jumpPressed: false };
   switch (demo.phase) {
     case 'wait':
       if (--demo.timer <= 0) demo.phase = 'run';
@@ -1067,6 +1202,7 @@ function demoInput() {
       if (player.grounded && player.x >= DEMO_JUMP_X[charKey]) {
         demo.phase = 'air';
         demo.timer = 0;
+        if (charKey === 'keen') return { ...move, run: true };   /* hop onto the pogo */
         return { ...move, jumpHeld: true, jumpPressed: true };
       }
       return move;
@@ -1088,6 +1224,12 @@ function demoInput() {
         demo.phase = 'admire'; demo.timer = 100; return idle;
       }
       demo.timer++;
+      if (charKey === 'keen') {
+        /* mounted the pogo — bounce across, arming a timed high bounce
+           each landing, then settle in to admire */
+        if (player.pogoBounce >= 4) { demo.phase = 'admire'; demo.timer = 120; return idle; }
+        return { dir: 1, run: true, jumpHeld: false, jumpPressed: player.vy > 5 };
+      }
       const flap = charKey === 'kirby' && demo.flutterDone &&
                    demo.timer > 10 && demo.timer < 150 && player.vy > 0.4;
       /* act three: spit the air out and drop like a stone */
@@ -1122,7 +1264,7 @@ function buildTabs() {
     btn.dataset.char = key;
     const num = document.createElement('span');
     num.className = 'tab-key';
-    num.textContent = i + 1;
+    num.textContent = (i + 1) % 10;        /* 10th character → key 0 */
     btn.append(num);
     const spr = SPRITE_CACHE[key].idle || SPRITE_CACHE[key].idle1;
     if (spr) {
@@ -1220,6 +1362,7 @@ addEventListener('keydown', e => {
   if (e.key === '7') selectChar('megamanx');
   if (e.key === '8') selectChar('kirby');
   if (e.key === '9') selectChar('ori');
+  if (e.key === '0') selectChar('keen');
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -1372,6 +1515,10 @@ function spriteFrameKey() {
       if (idx < ORI_ANIM[kind]) return kind + (idx + 1);
       return 'fall' + (Math.floor(animClock / 2) % ORI_ANIM.fall + 1);
     }
+    if (charKey === 'keen') {
+      if (player.pogo) return player.vy < 0 ? 'pogo2' : 'pogo1';   /* stretched up / crouched */
+      return player.vy < 0 ? 'jump' : 'fall';
+    }
     if (charKey === 'kirby') {
       if (player.spitAnim > 0)           /* exhale: squeeze, then the spit */
         return player.spitAnim > 6 ? 'spit1' : 'spit2';
@@ -1401,6 +1548,11 @@ function spriteFrameKey() {
     }
     if (charKey === 'ori')            /* the full 60-frame cycle, 30 fps */
       return 'run' + (Math.floor(animClock / 2) % ORI_ANIM.run + 1);
+    if (charKey === 'keen') {
+      if (player.pogo) return player.vy < 0 ? 'pogo2' : 'pogo1';
+      const d = Math.max(3, Math.round(8 - speed * 2));
+      return 'walk' + (Math.floor(animClock / d) % 2 + 1);
+    }
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05)
         return player.dashTime < 5 ? 'dash1' : 'dash2';

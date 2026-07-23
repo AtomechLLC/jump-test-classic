@@ -1,7 +1,7 @@
 # The Basics of Jumping — interactive edition
 
 An interactive recreation of Celia Wagar's animated diagram about jump physics
-([critpoints.net](https://critpoints.net)), extended to compare three classic
+([critpoints.net](https://critpoints.net)), extended to compare ten classic
 jump models side by side.
 
 **▶ Live demo:** <https://atomechllc.github.io/jump-test-classic/>
@@ -72,10 +72,15 @@ what the original games do) — and differ in what happens around the button:
   the sequence escalates skip → hop → spinning flip, with jump heights
   3 → 3.75 → 4.5 (from the SeinJump source). Miss the window and it
   resets. Soft-gravity while held, plus one mid-air Double Jump.
+- **Commander Keen (Keen)** — the sixth answer: a second gear. The plain
+  jump is ordinary (variable, release to cut), but tap <kbd>Shift</kbd>
+  to mount the *pogo* and Keen bounces continuously and automatically,
+  carrying his momentum. Every bounce is big, and pressing jump right as
+  he lands buys a taller *timed high-bounce* — a spring you play in time.
 
 ## Game-feel assists
 
-Two modern platformer assists are layered on top of all five characters,
+Two modern platformer assists are layered on top of every character,
 each with its own checkbox (on by default) so you can feel the difference:
 
 - **Coyote time** — jumping still works for 6 frames after walking off a
@@ -179,6 +184,23 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   Jump force, both serialized in scene data rather than code.
   A pixel-art placeholder remains as the
   fallback. Ori is © Microsoft / Moon Studios.
+- **Commander Keen** (Keen 4-6, "Galaxy"): the pogo and jump are sourced
+  from [Omnispeak](https://github.com/sulix/omnispeak) (a disassembly-based
+  reimplementation) cross-checked with
+  [KeenWiki](https://keenwiki.shikadi.net/wiki/Patch:Keen_(Keen_4)). Raw
+  engine units: 256 map-units = 1 tile, 70 Hz; normal jump velY −40 held
+  18 tics, pogo velY −48 held 24 tics, gravity 2 units/tic². A direct
+  velocity conversion under-predicts (the rise is timer-sustained), so the
+  px-frame values here are anchored on the observed heights — normal jump
+  ~3 tiles, pogo ~5, timed high-bounce ~6 — at firm gravity, which also
+  reproduces the sourced rise times (~18 and ~24 tics). The pogo is a
+  toggled continuous auto-bounce that carries horizontal momentum, and the
+  landing-timed high bounce is the *Impossible Pogo Trick* / Vorticons
+  high-bounce, folded into "press jump on the landing." Ground movement is
+  Galaxy-style: instant (no ground momentum) with momentum only in the air.
+  *Approximated:* the exact walk/air-accel constants and the high-bounce
+  input window (7 frames). Keen ships as original placeholder pixel art (no
+  owned game files to rip); Commander Keen is © id Software / ZeniMax.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
