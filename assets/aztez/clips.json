@@ -1,0 +1,111 @@
+{
+ "frameW": 960,
+ "frameH": 540,
+ "clips": {
+  "bg": {
+   "file": "bg.png",
+   "frames": 36,
+   "cols": 6,
+   "fps": 29.99,
+   "press": 0,
+   "loop": true,
+   "kind": "opaque"
+  },
+  "full": {
+   "file": "full.png",
+   "frames": 64,
+   "cols": 6,
+   "fps": 29.31,
+   "press": 2,
+   "loop": false,
+   "kind": "opaque"
+  },
+  "atk": {
+   "file": "atk.png",
+   "frames": 47,
+   "cols": 6,
+   "fps": 29.17,
+   "press": 2,
+   "loop": false,
+   "kind": "opaque"
+  },
+  "struck": {
+   "file": "struck.png",
+   "frames": 47,
+   "cols": 6,
+   "fps": 29.16,
+   "press": 2,
+   "loop": false,
+   "kind": "opaque"
+  },
+  "hiccup": {
+   "file": "hiccup.png",
+   "frames": 57,
+   "cols": 6,
+   "fps": 29.38,
+   "press": 2,
+   "loop": false,
+   "kind": "opaque"
+  },
+  "swing": {
+   "file": "swing.png",
+   "frames": 27,
+   "cols": 5,
+   "fps": 28.95,
+   "press": 1,
+   "x": 249,
+   "y": 215,
+   "fw": 495,
+   "fh": 159,
+   "kind": "effect"
+  },
+  "hit": {
+   "file": "hit.png",
+   "frames": 27,
+   "cols": 7,
+   "fps": 28.7,
+   "press": 1,
+   "x": 438,
+   "y": 86,
+   "fw": 332,
+   "fh": 318,
+   "kind": "effect"
+  },
+  "impact": {
+   "file": "impact.png",
+   "frames": 27,
+   "cols": 6,
+   "fps": 28.81,
+   "press": 1,
+   "x": 499,
+   "y": 222,
+   "fw": 380,
+   "fh": 123,
+   "kind": "effect"
+  },
+  "blood": {
+   "file": "blood.png",
+   "frames": 76,
+   "cols": 4,
+   "fps": 29.16,
+   "press": 1,
+   "x": 417,
+   "y": 138,
+   "fw": 543,
+   "fh": 313,
+   "kind": "effect"
+  },
+  "dust": {
+   "file": "dust.png",
+   "frames": 41,
+   "cols": 17,
+   "fps": 28.88,
+   "press": 1,
+   "x": 361,
+   "y": 374,
+   "fw": 151,
+   "fh": 83,
+   "kind": "effect"
+  }
+ }
+}
