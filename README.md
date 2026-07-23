@@ -214,8 +214,11 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   documented min/max. Ground movement is instant with momentum only in
   the air. *Approximated:* terminal fall speed, walk/air-accel constants,
   the pogo timer (18 frames vs the raw ≈ 20.6), and the continuous charge
-  curve. Keen ships as original placeholder pixel art (no owned game
-  files to rip); Commander Keen is © id Software / ZeniMax.
+  curve. Keen's sprites are the real ones, decoded from the
+  freely-distributable shareware episode's own data files (EGAHEAD +
+  EGASPRIT, LZW-decompressed and read as 5-plane masked EGA per the
+  ModdingWiki format docs) — walk ×4, the jump crouch/rise/fall, and both
+  pogo poses at native 16×24. Commander Keen is © id Software / ZeniMax.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
@@ -240,6 +243,9 @@ Genesis) by Triangly; Samus Aran (Super Metroid, SNES) uploaded by "Barack
 Obama"; X (Mega Man X, SNES) by Random Talking Bush; Kirby (Kirby Super
 Star, SNES) by Jermungandr. The Super Mario World small-Mario frames
 come from [Mario Universe](https://www.mariouniverse.com/sprites-snes-smw/).
+Keen's frames are decoded directly from the Commander Keen 1 shareware
+episode's data files (id Software released episode 1 as freely
+distributable shareware); Commander Keen is © id Software / ZeniMax.
 Metroid, Super Mario World, and Kirby are © Nintendo (Kirby with HAL
 Laboratory); Mega Man is © Capcom. If `assets/`
 is removed, the app automatically falls back to built-in placeholder pixel

@@ -529,15 +529,18 @@ const SPRITE_DEFS = {
     frun4: 'sonic_run4',
     ball1: 'sonic_ball1', ball2: 'sonic_ball2', ball3: 'sonic_ball3',
     ball4: 'sonic_ball4' } },
-  /* Keen ships as inline pixel art (no owned game files to rip from) —
-     these maps ARE the sprites, like Ori's original placeholder. */
-  keen: { inline: true, facesLeft: false, frames: {
-    idle: 1, walk1: 1, walk2: 1, jump: 1, fall: 1, pogo1: 1, pogo2: 1,
-    squat: 1 } },
+  /* Keen's sprites are decoded from the freely-distributable shareware
+     episode's own data files (EGAHEAD/EGASPRIT LZW + planar EGA) */
+  keen: { facesLeft: false, frames: {
+    idle: 'keen_idle',
+    walk1: 'keen_walk1', walk2: 'keen_walk2',
+    walk3: 'keen_walk3', walk4: 'keen_walk4',
+    jump: 'keen_jump', fall: 'keen_fall', squat: 'keen_squat',
+    pogo1: 'keen_pogo1', pogo2: 'keen_pogo2' } },
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 11;        // bump when sprite files change, so caches can't
+const ASSET_V = 12;        // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -1635,7 +1638,7 @@ function spriteFrameKey() {
     if (charKey === 'keen') {
       if (player.pogo) return player.vy < 0 ? 'pogo2' : 'pogo1';
       const d = Math.max(3, Math.round(8 - speed * 2));
-      return 'walk' + (Math.floor(animClock / d) % 2 + 1);
+      return 'walk' + (Math.floor(animClock / d) % 4 + 1);
     }
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05)
