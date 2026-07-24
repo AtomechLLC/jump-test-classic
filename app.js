@@ -518,11 +518,12 @@ const SPRITE_DEFS = {
      screen pixels (scale = 1/SCALE). Every animation is the complete
      sequence from the game's atlas metadata, in authored order; the
      native art faces right. Counts live in ORI_ANIM. */
-  ori: { facesLeft: false, scale: 1 / SCALE, frames: (() => {
+  ori: { facesLeft: false, scale: 1 / SCALE, smoothTab: true, frames: (() => {
     const f = {};
     for (const [p, n] of [['run', 60], ['idle', 40], ['fall', 36],
                           ['skip', 27], ['hop', 34], ['flip', 40], ['dj', 20]])
       for (let i = 1; i <= n; i++) f[p + i] = 'ori_' + p + i;
+    f.tab = 'ori_logo';               /* the game's title wordmark */
     return f;
   })() },
   sonic: { facesLeft: false, frames: {
@@ -550,7 +551,7 @@ const SPRITE_DEFS = {
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 13;        // bump when sprite files change, so caches can't
+const ASSET_V = 14;        // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -1371,14 +1372,17 @@ function buildTabs() {
     num.className = 'tab-key';
     num.textContent = (i + 1) % 10;        /* 10th character → key 0 */
     btn.append(num);
-    const spr = SPRITE_CACHE[key].idle || SPRITE_CACHE[key].idle1;
+    const spr = SPRITE_CACHE[key].tab || SPRITE_CACHE[key].idle ||
+                SPRITE_CACHE[key].idle1;
     if (spr) {
+      const img = spr.right;            /* natural size, not world size */
       const icon = document.createElement('canvas');
-      icon.width = spr.w; icon.height = spr.h;
-      icon.style.width = spr.w * (26 / spr.h) + 'px';
+      icon.width = img.width; icon.height = img.height;
+      icon.style.width = img.width * (26 / img.height) + 'px';
       icon.style.height = '26px';
-      icon.style.imageRendering = 'pixelated';
-      icon.getContext('2d').drawImage(spr.right, 0, 0);
+      icon.style.imageRendering =
+        SPRITE_DEFS[key] && SPRITE_DEFS[key].smoothTab ? 'auto' : 'pixelated';
+      icon.getContext('2d').drawImage(img, 0, 0);
       btn.append(icon);
     }
     const label = document.createElement('span');
