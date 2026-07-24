@@ -402,12 +402,15 @@ if (rising && !jumpHeld)
       walkSpeed: 1.8,         // instant on the ground
       airAccel: 0.25,         // ...but momentum in the air
       squatFrames: 16,        // Keen 1: squat length (auto-launch when done)
-      chargeMinJump: 3.75,    // Keen 1: instant-release launch (~2.8 tiles)
-      chargeMaxJump: 4.6,     // Keen 1: full-squat launch (~4.1 tiles)
+      chargeMaxJump: 4.6,     // Keen 1: full-squat launch (~4 tiles); the
+                              // launch scales LINEARLY with the hold, per the
+                              // disassembly — so a tap is a genuinely tiny hop
       ascentSpeed: 2.917,     // Keen 4: constant while held + timer running
       sustainFrames: 15,      // Keen 4: the jump timer (18 tics)
-      gravity: 0.17,          // both models (measured ≈ sourced!)
-      terminal: 10,
+      gravity: 0.17,          // Keen 1 + pogo (measured ≈ sourced)
+      k4Gravity: 0.3,         // Keen 4 post-timer (sourced 0.17; raised so the
+                              // flat climb reads against the drop)
+      terminal: 5.1,          // 70 units/tic, from CK_PhysGravityHigh
       pogoSpeed: 3.5,         // pogo ascent (velY 48)
       pogoSustain: 18,        // its timer — only counts down while jump is held
     },
@@ -415,28 +418,29 @@ if (rising && !jumpHeld)
       { key: 'model',         label: 'Model (0=Keen1 · 1=Keen4)', min: 0, max: 1, step: 1 },
       { key: 'squatFrames',   label: 'K1 squat (frames)',  min: 2, max: 30, step: 1 },
       { key: 'chargeMaxJump', label: 'K1 full launch',     min: 3, max: 7, step: 0.05 },
+      { key: 'gravity',       label: 'K1 gravity',         min: 0.05, max: 0.5, step: 0.005 },
       { key: 'ascentSpeed',   label: 'K4 ascent speed',    min: 1, max: 5, step: 0.05 },
-      { key: 'sustainFrames', label: 'K4 timer (frames)',  min: 0, max: 30, step: 1 },
-      { key: 'gravity',       label: 'Gravity',            min: 0.05, max: 0.5, step: 0.005 },
+      { key: 'k4Gravity',     label: 'K4 gravity',         min: 0.05, max: 0.6, step: 0.005 },
     ],
     explainer: `
       <h2>The Commander Keen Jump</h2>
       <p><b>Keen 1</b> charges on the ground: hold jump and Keen squats in
-      place (~0.28 s); release early for a small hop, hold to completion
-      and he auto-launches the full jump — a true parabola, launch scaled
-      by the squat. Precise and smooth, but you pause before every hop —
-      an identity Jump King later built a whole game on. <b>Keen 4</b>
-      (flip the model slider) leaves the ground instantly and climbs at
+      place (~0.28 s) while launch speed <i>builds</i> — release whenever
+      you like, or let the squat finish for the full jump. Height scales
+      with the <i>square</i> of the hold, so a tap is a genuinely tiny
+      hop. Precise and smooth, but you pause before every jump — an
+      identity Jump King later built a whole game on. <b>Keen 4</b> (flip
+      the model slider) leaves the ground instantly and climbs at
       <i>constant speed</i> while held and a timer runs — no gravity — so
-      the rise is literally flat.</p>
+      the rise is literally flat until the drop.</p>
       <p class="rule"><b>The twist: the pogo.</b> Tap <kbd>Shift</kbd> and
       Keen auto-bounces (~2 tiles), carrying his momentum; hold
       <kbd>Space</kbd> through a bounce to stretch it to ~6 tiles. Tap
       <kbd>Shift</kbd> to step off.</p>`,
     pseudocode:
 `<span class="hl">Keen 1: hold → squat++ (stay grounded)
-release/done → vy = lerp(3.9, 4.7,
-                    squat/16), then gravity</span>
+release/done → vy = 4.6·squat/16,
+then gravity   // height ∝ hold²</span>
 Keen 4: instant; while held &amp; timer:
       <span class="hl">NO gravity — the flat climb</span>
 Shift: pogo — bounce -3.5, same sustain`,
@@ -846,8 +850,10 @@ function stepPhysics(st, charKey, P, input) {
           st.squatT++;                     /* charging — stays grounded */
         }
         if (!input.jumpHeld || st.squatT >= P.squatFrames) {
-          const t = Math.min(st.squatT, P.squatFrames) / P.squatFrames;
-          st.vy = -(P.chargeMinJump + (P.chargeMaxJump - P.chargeMinJump) * t);
+          /* speed builds linearly over the squat (per the disassembly:
+             the pre-jump pause accumulates the launch speed) */
+          const t = Math.max(1, Math.min(st.squatT, P.squatFrames)) / P.squatFrames;
+          st.vy = -P.chargeMaxJump * t;
           st.squatT = -1;
           st.grounded = false; st.jumping = true;
           st.takeoffX = st.x; st.takeoffY = st.y; ev.jumped = true;
@@ -1178,7 +1184,9 @@ function stepPhysics(st, charKey, P, input) {
         st.jumpTimer--;
       } else {
         st.jumpTimer = 0;
-        st.vy += P.gravity;
+        /* the K4 jump uses its own (contrast-tuned) gravity; the K1 jump
+           and the pogo keep the measured 0.17 */
+        st.vy += (P.model >= 1 && !st.pogo) ? P.k4Gravity : P.gravity;
       }
       if (st.vy > P.terminal) st.vy = P.terminal;
     } else if (charKey === 'kirby') {

@@ -198,9 +198,13 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   (47-frame airtime), full jump 4.12 tiles (57 frames, takeoff ~17
   frames after the press), decelerating ballistic ascent with gravity
   ≈ 0.17 px-frame² — which happens to equal Keen 4's sourced constant.
-  The sim reproduces 2.86 / 4.03 tiles with matching timings; the charge
-  is modeled as a smooth lerp (3.75 → 4.6 px-frame over the squat) where
-  the original quantized to its squat animation poses. **Keen 4** (model
+  Per the disassembly-derived
+  [KeenWiki patch docs](https://keenwiki.shikadi.net/wiki/Patch:Keen_jumping_(Vorticons)),
+  launch speed *builds during the pre-jump pause* (the jump phase itself
+  "only gets him 3 pixels off the ground"; jump height 6 half-tiles,
+  scaled by the pause) — so the charge is linear in hold time, height ∝
+  hold², and a bare tap is a near-zero hop. The measured 13-frame-hold
+  arc fits: (13/16)² × 4.12 ≈ 2.7 ≈ the observed 2.83 tiles. **Keen 4** (model
   slider → 1) is the *timer*: instant takeoff, constant ascent while held
   and the timer runs (gravity suspended — the rise is literally flat),
   gravity on release or expiry. Sourced from
@@ -208,7 +212,12 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   [KeenWiki](https://keenwiki.shikadi.net/wiki/Patch:Keen_(Keen_4))
   and converted directly (256 map-units = 1 tile, 70 Hz → 60 Hz): velY 40
   units/tic → 2.917 px-frame, jumpTimer 18 tics → 15 frames, gravity 2
-  units/tic² → 0.170 px-frame², pogo velY 48 → 3.5 px-frame. The pogo is
+  units/tic² (velY += 4 every odd tic in `CK_PhysGravityHigh`) → 0.170
+  px-frame², terminal 70 units/tic → 5.1 px-frame, pogo velY 48 → 3.5
+  px-frame. The shipped Keen 4 post-timer gravity is deliberately raised
+  to 0.3 (a declared departure from the sourced 0.170) so the flat
+  timer-climb reads visibly against the drop in a side-by-side; the
+  sourced value made the two models hard to tell apart. The pogo is
   a toggled continuous momentum-carrying auto-bounce whose sustain only
   counts while jump is held: unheld ≈ 2 tiles, held ≈ 6, matching the
   documented min/max. Ground movement is instant with momentum only in
