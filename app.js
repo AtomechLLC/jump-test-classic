@@ -540,11 +540,17 @@ const SPRITE_DEFS = {
     walk1: 'keen_walk1', walk2: 'keen_walk2',
     walk3: 'keen_walk3', walk4: 'keen_walk4',
     jump: 'keen_jump', fall: 'keen_fall', squat: 'keen_squat',
-    pogo1: 'keen_pogo1', pogo2: 'keen_pogo2' } },
+    pogo1: 'keen_pogo1', pogo2: 'keen_pogo2',
+    /* the Galaxy-era Keen, shown when the model slider is on Keen 4 */
+    k4idle: 'keen4_idle',
+    k4walk1: 'keen4_walk1', k4walk2: 'keen4_walk2',
+    k4walk3: 'keen4_walk3', k4walk4: 'keen4_walk4',
+    k4jump: 'keen4_jump', k4fall: 'keen4_fall',
+    k4pogo1: 'keen4_pogo1', k4pogo2: 'keen4_pogo2' } },
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 12;        // bump when sprite files change, so caches can't
+const ASSET_V = 13;        // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -1183,6 +1189,11 @@ function stepPhysics(st, charKey, P, input) {
       if (timered && st.vy < 0 && input.jumpHeld && st.jumpTimer > 0) {
         st.jumpTimer--;
       } else {
+        /* K4 jump: RELEASING during the timer ends the climb outright
+           (vy = 0), so a tap is just its short flat rise — keeps taps
+           under the 2-tile block. Timer EXPIRY keeps the momentum. */
+        if (P.model >= 1 && !st.pogo && st.jumpTimer > 0 && st.vy < 0)
+          st.vy = 0;
         st.jumpTimer = 0;
         /* the K4 jump uses its own (contrast-tuned) gravity; the K1 jump
            and the pogo keep the measured 0.17 */
@@ -1610,8 +1621,9 @@ function spriteFrameKey() {
       return 'fall' + (Math.floor(animClock / 2) % ORI_ANIM.fall + 1);
     }
     if (charKey === 'keen') {
-      if (player.pogo) return player.vy < 0 ? 'pogo2' : 'pogo1';   /* stretched up / crouched */
-      return player.vy < 0 ? 'jump' : 'fall';
+      const k4 = P.model >= 1 ? 'k4' : '';   /* Galaxy-era art in K4 mode */
+      if (player.pogo) return k4 + (player.vy < 0 ? 'pogo2' : 'pogo1');
+      return k4 + (player.vy < 0 ? 'jump' : 'fall');
     }
     if (charKey === 'kirby') {
       if (player.spitAnim > 0)           /* exhale: squeeze, then the spit */
@@ -1629,7 +1641,8 @@ function spriteFrameKey() {
     }
     return player.jumping ? 'jump' : 'idle';
   }
-  if (charKey === 'keen' && player.squatT >= 0) return 'squat';
+  if (charKey === 'keen' && player.squatT >= 0)     /* settle into the crouch */
+    return player.squatT < P.squatFrames * 0.4 ? 'idle' : 'squat';
   if (speed > 0.05) {
     if (charKey === 'metroid') {
       const d = Math.max(2, Math.round(5 - speed * 0.6));
@@ -1644,9 +1657,10 @@ function spriteFrameKey() {
     if (charKey === 'ori')            /* the full 60-frame cycle, 30 fps */
       return 'run' + (Math.floor(animClock / 2) % ORI_ANIM.run + 1);
     if (charKey === 'keen') {
-      if (player.pogo) return player.vy < 0 ? 'pogo2' : 'pogo1';
+      const k4 = P.model >= 1 ? 'k4' : '';
+      if (player.pogo) return k4 + (player.vy < 0 ? 'pogo2' : 'pogo1');
       const d = Math.max(3, Math.round(8 - speed * 2));
-      return 'walk' + (Math.floor(animClock / d) % 4 + 1);
+      return k4 + 'walk' + (Math.floor(animClock / d) % 4 + 1);
     }
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05)
@@ -1671,6 +1685,7 @@ function spriteFrameKey() {
   }
   if (charKey === 'ori')              /* the 40-frame breathing idle */
     return 'idle' + (Math.floor(animClock / 2) % ORI_ANIM.idle + 1);
+  if (charKey === 'keen' && P.model >= 1) return 'k4idle';
   return 'idle';
 }
 

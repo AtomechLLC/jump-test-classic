@@ -214,10 +214,15 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   units/tic → 2.917 px-frame, jumpTimer 18 tics → 15 frames, gravity 2
   units/tic² (velY += 4 every odd tic in `CK_PhysGravityHigh`) → 0.170
   px-frame², terminal 70 units/tic → 5.1 px-frame, pogo velY 48 → 3.5
-  px-frame. The shipped Keen 4 post-timer gravity is deliberately raised
-  to 0.3 (a declared departure from the sourced 0.170) so the flat
-  timer-climb reads visibly against the drop in a side-by-side; the
-  sourced value made the two models hard to tell apart. The pogo is
+  px-frame. Two declared legibility departures from source: the shipped
+  Keen 4 post-timer gravity is raised to 0.3 (sourced 0.170) so the flat
+  timer-climb reads visibly against the drop, and *releasing* during the
+  timer ends the climb outright (vy = 0) rather than carrying momentum
+  into the fall — so a tap in either model stays under the playfield's
+  2-tile block (K4 tap ≈ 0.5–1.5 tiles by hold length; K1 tap ≈ 0.2–1
+  tile via the hold² charge). Timer *expiry* keeps its momentum, so the
+  full K4 jump is unchanged. In K4 mode Keen also swaps to his
+  Galaxy-era sprites. The pogo is
   a toggled continuous momentum-carrying auto-bounce whose sustain only
   counts while jump is held: unheld ≈ 2 tiles, held ≈ 6, matching the
   documented min/max. Ground movement is instant with momentum only in
@@ -254,7 +259,10 @@ Star, SNES) by Jermungandr. The Super Mario World small-Mario frames
 come from [Mario Universe](https://www.mariouniverse.com/sprites-snes-smw/).
 Keen's frames are decoded directly from the Commander Keen 1 shareware
 episode's data files (id Software released episode 1 as freely
-distributable shareware); Commander Keen is © id Software / ZeniMax.
+distributable shareware); his Galaxy-era frames (shown in Keen 4 mode)
+come from the
+[Goodbye, Galaxy sheet](https://www.spriters-resource.com/ms_dos/commanderkeen4/asset/24187/)
+ripped by Dolphman. Commander Keen is © id Software / ZeniMax.
 Metroid, Super Mario World, and Kirby are © Nintendo (Kirby with HAL
 Laboratory); Mega Man is © Capcom. If `assets/`
 is removed, the app automatically falls back to built-in placeholder pixel
