@@ -445,9 +445,63 @@ Keen 4: instant; while held &amp; timer:
       <span class="hl">NO gravity — the flat climb</span>
 Shift: pogo — bounce -3.5, same sustain`,
   },
+
+  celeste: {
+    name: 'Madeline', game: 'Celeste', accent: '#d94a64',
+    hitboxW: 12,
+    defaults: {
+      /* Every value converted from the officially released Player.cs
+         (github.com/NoelFB/Celeste) at ×2 scale — Celeste tiles are 8 px,
+         ours 16 — and 60 fps. Sourced: MaxRun 90, RunAccel 1000,
+         RunReduce 400, AirMult 0.65, JumpSpeed -105, JumpHBoost 40,
+         VarJumpTime 0.2 s, HalfGravThreshold 40, Gravity 900,
+         MaxFall 160, JumpGraceTime 0.1 s, DashSpeed 240,
+         EndDashSpeed 160, DashTime 0.15 s, DashCooldown 0.2 s. */
+      maxRun: 3.0,
+      runAccel: 0.556,
+      runReduce: 0.222,
+      airMult: 0.65,
+      jumpSpeed: 3.5,
+      jumpHBoost: 1.333,       // jumping adds a burst of ground speed
+      varJumpFrames: 12,       // hold to stay at jump speed (0.2 s)
+      halfGravThreshold: 1.333,
+      gravity: 0.5,
+      maxFall: 5.333,
+      dashSpeed: 8,            // the dash: 240 px/s for 0.15 s
+      endDashSpeed: 5.333,
+      dashFrames: 9,
+      dashCooldown: 12,
+    },
+    sliders: [
+      { key: 'jumpSpeed',         label: 'Jump speed',        min: 1.5, max: 6, step: 0.05 },
+      { key: 'varJumpFrames',     label: 'Var-jump (frames)', min: 0, max: 30, step: 1 },
+      { key: 'gravity',           label: 'Gravity',           min: 0.1, max: 1.2, step: 0.01 },
+      { key: 'halfGravThreshold', label: 'Apex-hang window',  min: 0, max: 4, step: 0.05 },
+      { key: 'dashSpeed',         label: 'Dash speed',        min: 3, max: 14, step: 0.1 },
+      { key: 'maxRun',            label: 'Run speed',         min: 1, max: 6, step: 0.05 },
+    ],
+    explainer: `
+      <h2>The Celeste Jump</h2>
+      <p>The modern synthesis, straight from the released Player.cs: jump
+      holds you at launch speed while a 0.2 s timer runs (release ends
+      it), gravity <i>halves</i> near the apex while you hold — the
+      hang — and every jump adds a burst of ground speed. Coyote time
+      (0.1 s) and jump buffering are <b>built into the game itself</b> —
+      the assists this sample lets you toggle are Celeste's defaults.</p>
+      <p class="rule"><b>The twist: the dash.</b> <kbd>Shift</kbd> bursts
+      Madeline forward at high speed for 9 frames, gravity off — one per
+      airtime, refilled on landing. The whole game grows from it.</p>`,
+    pseudocode:
+`jump: vy = -3.5; vx += 1.33·dir
+<span class="hl">while held &amp; 12f: vy stays -3.5
+near apex &amp; held: gravity ×0.5</span>
+gravity 0.5 → max fall 5.33
+<span class="hl">Shift: dash 8 px/f, 9f, no gravity;
+refills on landing</span>`,
+  },
 };
 
-const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx', 'kirby', 'ori', 'keen'];
+const CHAR_ORDER = ['castlevania', 'mario', 'smw', 'sonic', 'metroid', 'megaman', 'megamanx', 'kirby', 'ori', 'keen', 'celeste'];
 
 /* ---- modern game-feel assists (toggleable, applied to every character) ---- */
 const COYOTE_FRAMES = 6;   // grace window after walking off a ledge
@@ -548,6 +602,10 @@ const SPRITE_DEFS = {
     k4walk3: 'keen4_walk3', k4walk4: 'keen4_walk4',
     k4jump: 'keen4_jump', k4fall: 'keen4_fall',
     k4pogo1: 'keen4_pogo1', k4pogo2: 'keen4_pogo2' } },
+  /* Madeline is inline placeholder art for now (no rippable gameplay
+     sheet published; the real frames live in the game's Gameplay atlas) */
+  celeste: { inline: true, facesLeft: false, frames: {
+    idle: 1, run1: 1, run2: 1, jump: 1, fall: 1, dash: 1 } },
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
@@ -712,6 +770,43 @@ FALLBACK_MAPS.keen = {
     '..bbbbbbbbbb..', '..bbb....bbb..', '.rrr......rrr.'],
 };
 
+/* Madeline: red hair, teal jacket, maroon pants — original placeholder
+   pixel art (Madeline's gameplay frames aren't on the sprite sites; the
+   real ones can be pulled from an owned copy's Gameplay atlas later). */
+FALLBACK_PALETTES.celeste = { r: '#c03a45', j: '#3e8ec9', p: '#6e2a4f',
+  s: '#f4d5b0', k: '#31212b' };
+FALLBACK_MAPS.celeste = {
+  idle: [
+    '....rrrrrr......', '...rrrrrrrr.....', '..rrrrrrrrrr....', '..rrssssssrr....',
+    '..rssksskssrr...', '..rsssssssrrr...', '...rssssssrrr...', '....jjjjjjrr....',
+    '...jjjjjjjjr....', '..jjjjjjjjjj....', '..sjjjjjjjjs....', '...jjjjjjjj.....',
+    '....pppppp......', '....pp..pp......', '....pp..pp......', '...kk....kk.....'],
+  run1: [
+    '....rrrrrr......', '...rrrrrrrr.....', '..rrrrrrrrrr....', '..rrssssssrr....',
+    '..rssksskssrr...', '..rsssssssrrr...', '...rssssssrrr...', '....jjjjjjrr....',
+    '...jjjjjjjjr....', '..jjjjjjjjjj....', '..sjjjjjjjjs....', '...jjjjjjjj.....',
+    '...ppp..ppp.....', '..pp......pp....', '.kk........kk...'],
+  run2: [
+    '....rrrrrr......', '...rrrrrrrr.....', '..rrrrrrrrrr....', '..rrssssssrr....',
+    '..rssksskssrr...', '..rsssssssrrr...', '...rssssssrrr...', '....jjjjjjrr....',
+    '...jjjjjjjjr....', '..jjjjjjjjjj....', '..sjjjjjjjjs....', '...jjjjjjjj.....',
+    '.....pppp.......', '....pppp........', '....kkkk........'],
+  jump: [
+    '....rrrrrr......', '...rrrrrrrr.....', '..rrrrrrrrrr....', '..rrssssssrr....',
+    '..rssksskssrr...', '..rsssssssrr....', '...rssssssr.....', '..s.jjjjjj.s....',
+    '..sjjjjjjjjs....', '...jjjjjjjj.....', '....jjjjjj......', '....pp.ppp......',
+    '...pp...pp......', '...kk...kk......'],
+  fall: [
+    '..r.rrrrrr.r....', '..rrrrrrrrrr....', '..rrrrrrrrrr....', '..rrssssssrr....',
+    '..rssksskssrr...', '..rsssssssrr....', '..s.ssssss.s....', '..sjjjjjjjjs....',
+    '..sjjjjjjjjs....', '...jjjjjjjj.....', '....jjjjjj......', '...pp....pp.....',
+    '..pp......pp....', '..kk......kk....'],
+  dash: [
+    '......rrrrrrrr..', '..rrrrrrrrrrrr..', '.rrrrssssssrrr..', '.rrssksskssrr...',
+    '..rsssssssss....', '...jjjjjjjjjj...', '..sjjjjjjjjjjs..', '...jjjjjjjjjj...',
+    '....pppppppp....', '.....pp...ppkk..', '...kkkk.........'],
+};
+
 /* frameKey → fallback pixel map, per character */
 function fallbackMapFor(charKey, frameKey) {
   const maps = FALLBACK_MAPS[charKey];
@@ -808,6 +903,7 @@ function newPlayerState(x) {
            lastChainStage: 0, sustain: 0, dashTime: 0, fallTime: 0,
            runHeld: false, spitAnim: 0, spitFx: null,
            pogo: false, pogoBounce: 0, jumpTimer: 0, squatT: -1,
+           dashes: 1, dashing: 0, dashCd: 0, dashDir: 1, varJump: 0,
            takeoffX: x, takeoffY: GROUND };
 }
 
@@ -869,9 +965,28 @@ function stepPhysics(st, charKey, P, input) {
     } else st.squatT = -1;
   }
 
+  /* Madeline's dash: one per airtime, refilled on landing, on the run
+     button — and the dash timer ticks here so ground dashes work too */
+  if (charKey === 'celeste') {
+    if (st.dashCd > 0) st.dashCd--;
+    const dashPressed = input.run && !st.runHeld;
+    st.runHeld = input.run;
+    if (dashPressed && st.dashes > 0 && st.dashCd <= 0 && st.dashing <= 0) {
+      st.dashes--; st.dashCd = P.dashCooldown; st.dashing = P.dashFrames;
+      st.dashDir = input.dir !== 0 ? input.dir : st.facing;
+      st.vy = 0;
+    } else if (st.dashing > 0) {
+      st.dashing--;
+      if (st.dashing === 0) st.vx = st.dashDir * P.endDashSpeed;
+    }
+  }
+
   /* jump start — directly, via a buffered early press, or via coyote time */
-  const buffered = ASSISTS.buffer && st.grounded && st.jumpBuffer > 0;
-  const coyote = ASSISTS.coyote && !st.grounded && !st.jumping &&
+  /* Celeste ships with coyote time and buffering built in (JumpGraceTime
+     0.1 s) — hers work even with the sample's assist toggles off */
+  const native = charKey === 'celeste';
+  const buffered = (ASSISTS.buffer || native) && st.grounded && st.jumpBuffer > 0;
+  const coyote = (ASSISTS.coyote || native) && !st.grounded && !st.jumping &&
                  st.coyoteTimer > 0 && input.jumpPressed;
   /* Keen handles its own takeoffs: pogo bounces on landing, and the
      Keen 1 squat launches from its own charge logic above */
@@ -895,6 +1010,12 @@ function stepPhysics(st, charKey, P, input) {
       /* Keen 4: instant takeoff, constant-speed ascent under a timer */
       st.vy = -P.ascentSpeed;
       st.jumpTimer = P.sustainFrames;
+    } else if (charKey === 'celeste') {
+      /* Player.cs Jump(): launch speed + horizontal boost + var timer */
+      st.vy = -P.jumpSpeed;
+      st.vx += P.jumpHBoost * input.dir;
+      st.varJump = P.varJumpFrames;
+      st.dashing = 0;
     } else {
       st.vy = -P.jumpForce;
       if (charKey === 'metroid') st.spinJump = Math.abs(st.vx) > 0.2;
@@ -924,7 +1045,8 @@ function stepPhysics(st, charKey, P, input) {
     st.floating = true;                  /* puff up — every press is a flap */
     st.vy = -P.flapImpulse;
     st.flapAnim = 12;                    /* play the flap animation once */
-  } else if (ASSISTS.buffer && input.jumpPressed && !st.grounded) {
+  } else if ((ASSISTS.buffer || charKey === 'celeste') &&
+             input.jumpPressed && !st.grounded) {
     st.jumpBuffer = BUFFER_FRAMES;       /* remember the early press */
   }
 
@@ -1069,6 +1191,19 @@ function stepPhysics(st, charKey, P, input) {
     /* dash pose timing: the crouch-in frame, then the full stretch */
     st.dashTime = (st.grounded && Math.abs(st.vx) > P.walkSpeed + 0.05)
       ? (st.dashTime || 0) + 1 : 0;
+  } else if (charKey === 'celeste') {
+    if (st.dashing > 0) {
+      st.vx = st.dashDir * P.dashSpeed;    /* the dash owns the speed */
+    } else {
+      const target = input.dir * P.maxRun;
+      const mult = st.grounded ? 1 : P.airMult;
+      /* over max in the held direction → ease back (RunReduce) */
+      const over = input.dir !== 0 && Math.sign(st.vx) === input.dir &&
+                   Math.abs(st.vx) > P.maxRun;
+      const a = (over ? P.runReduce : P.runAccel) * mult;
+      st.vx = st.vx < target ? Math.min(st.vx + a, target)
+                             : Math.max(st.vx - a, target);
+    }
   } else if (charKey === 'keen') {
     if (st.grounded) {
       /* instant on the ground — but a Keen 1 squat locks you in place */
@@ -1154,6 +1289,7 @@ function stepPhysics(st, charKey, P, input) {
       } else {
         if (!st.grounded) ev.landed = true;
         if (!st.grounded && charKey === 'ori') st.chainTimer = P.chainWindow;
+        if (charKey === 'celeste') st.dashes = 1;   /* landing refills the dash */
         st.grounded = true; st.vy = 0; st.jumping = false; st.floating = false;
         st.jumpsUsed = 0;
       }
@@ -1165,7 +1301,21 @@ function stepPhysics(st, charKey, P, input) {
 
   /* gravity — applied AFTER the position update, like the diagram says */
   if (!st.grounded && !skipMove) {
-    if (charKey === 'mario' || charKey === 'smw') {
+    if (charKey === 'celeste') {
+      if (st.dashing > 0) {
+        st.vy = 0;                       /* the dash suspends gravity */
+      } else {
+        /* half gravity near the apex while held — the hang */
+        const mult = (Math.abs(st.vy) < P.halfGravThreshold &&
+                      input.jumpHeld) ? 0.5 : 1;
+        st.vy = Math.min(st.vy + P.gravity * mult, P.maxFall);
+        if (st.varJump > 0) {            /* variable jump: hold to stay
+                                            at launch speed */
+          if (input.jumpHeld) { st.vy = Math.min(st.vy, -P.jumpSpeed); st.varJump--; }
+          else st.varJump = 0;
+        }
+      }
+    } else if (charKey === 'mario' || charKey === 'smw') {
       st.vy += (st.vy < 0 && input.jumpHeld) ? st.holdG : st.fallG;
       if (st.vy > P.terminal) st.vy = P.terminal;
     } else if (charKey === 'ori') {
@@ -1268,7 +1418,7 @@ let jumpQueued = false;
 
 const DEMO_JUMP_X = { castlevania: 180, mario: 150, smw: 160, sonic: 170,
                       metroid: 165, megaman: 180, megamanx: 165, kirby: 170,
-                      ori: 130, keen: 120 };
+                      ori: 130, keen: 120, celeste: 140 };
 const demo = { phase: 'off', timer: 0, pinned: false, flutterDone: false };
 
 function startDemo() {
@@ -1314,6 +1464,10 @@ function demoInput() {
         demo.phase = 'admire'; demo.timer = 100; return idle;
       }
       demo.timer++;
+      if (charKey === 'celeste')
+        /* full-hold jump, hang at the apex, then dash forward */
+        return { dir: 1, run: demo.timer > 8 && player.vy > -0.5,
+                 jumpHeld: true, jumpPressed: false };
       if (charKey === 'keen') {
         /* act one: tap → small hop. act two: hold through the squat →
            the full jump. act three: pogo, held bounces. */
@@ -1370,7 +1524,7 @@ function buildTabs() {
     btn.dataset.char = key;
     const num = document.createElement('span');
     num.className = 'tab-key';
-    num.textContent = (i + 1) % 10;        /* 10th character → key 0 */
+    num.textContent = i < 9 ? i + 1 : (i === 9 ? 0 : '-');
     btn.append(num);
     const spr = SPRITE_CACHE[key].tab || SPRITE_CACHE[key].idle ||
                 SPRITE_CACHE[key].idle1;
@@ -1472,6 +1626,7 @@ addEventListener('keydown', e => {
   if (e.key === '8') selectChar('kirby');
   if (e.key === '9') selectChar('ori');
   if (e.key === '0') selectChar('keen');
+  if (e.key === '-') selectChar('celeste');
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -1629,6 +1784,8 @@ function spriteFrameKey() {
       if (player.pogo) return k4 + (player.vy < 0 ? 'pogo2' : 'pogo1');
       return k4 + (player.vy < 0 ? 'jump' : 'fall');
     }
+    if (charKey === 'celeste')
+      return player.dashing > 0 ? 'dash' : (player.vy < 0 ? 'jump' : 'fall');
     if (charKey === 'kirby') {
       if (player.spitAnim > 0)           /* exhale: squeeze, then the spit */
         return player.spitAnim > 6 ? 'spit1' : 'spit2';
@@ -1665,6 +1822,10 @@ function spriteFrameKey() {
       if (player.pogo) return k4 + (player.vy < 0 ? 'pogo2' : 'pogo1');
       const d = Math.max(3, Math.round(8 - speed * 2));
       return k4 + 'walk' + (Math.floor(animClock / d) % 4 + 1);
+    }
+    if (charKey === 'celeste') {
+      if (player.dashing > 0) return 'dash';
+      return 'run' + (Math.floor(animClock / 5) % 2 + 1);
     }
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05)

@@ -82,6 +82,12 @@ what the original games do) — and differ in what happens around the button:
   no gravity during the climb, a literally flat rise. Tap
   <kbd>Shift</kbd> for the *pogo*: continuous momentum-carrying
   auto-bounces (~2 tiles) stretched to ~6 by holding jump through them.
+- **Celeste (Madeline)** — the seventh answer: the modern synthesis. A
+  variable jump that holds launch speed on a 0.2 s timer, *half gravity*
+  near the apex while held (the hang), a horizontal speed boost on every
+  jump, and coyote time + jump buffering built into the game itself. The
+  twist is the <kbd>Shift</kbd> *dash* — 9 frames of pure velocity with
+  gravity off, one per airtime, refilled on landing.
 
 ## Game-feel assists
 
@@ -233,6 +239,24 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   EGASPRIT, LZW-decompressed and read as 5-plane masked EGA per the
   ModdingWiki format docs) — walk ×4, the jump crouch/rise/fall, and both
   pogo poses at native 16×24. Commander Keen is © id Software / ZeniMax.
+- **Celeste**: every constant comes from the
+  [officially released Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs),
+  converted at ×2 scale (Celeste tiles are 8 px, ours 16) and 60 fps:
+  MaxRun 90 → 3.0 px-frame, RunAccel 1000 → 0.556, RunReduce 400 →
+  0.222, AirMult 0.65, JumpSpeed 105 → 3.5, JumpHBoost 40 → 1.333,
+  VarJumpTime 0.2 s → 12 frames (hold to stay at launch speed; release
+  ends it), HalfGravThreshold 40 → 1.333 (half gravity near the apex
+  while held), Gravity 900 → 0.5 px-frame², MaxFall 160 → 5.333,
+  JumpGraceTime 0.1 s → 6 frames (identical to this sample's coyote
+  assist — for Madeline it is native and works with the toggles off,
+  as does her jump buffer), DashSpeed 240 → 8, EndDashSpeed 160 →
+  5.333, DashTime 0.15 s → 9 frames, DashCooldown 0.2 s → 12 frames,
+  dash refilled on landing. *Simplified:* the dash here is horizontal
+  only (the game's is 8-way), and wall mechanics, climbing, stamina,
+  super/hyper dashes, and fast-fall are out of scope. Madeline is
+  placeholder pixel art for now (her gameplay frames aren't on the
+  sprite sites; they can be decoded from an owned copy's Gameplay
+  atlas). Celeste is © Maddy Makes Games.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
