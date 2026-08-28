@@ -602,14 +602,20 @@ const SPRITE_DEFS = {
     k4walk3: 'keen4_walk3', k4walk4: 'keen4_walk4',
     k4jump: 'keen4_jump', k4fall: 'keen4_fall',
     k4pogo1: 'keen4_pogo1', k4pogo2: 'keen4_pogo2' } },
-  /* Madeline is inline placeholder art for now (no rippable gameplay
-     sheet published; the real frames live in the game's Gameplay atlas) */
-  celeste: { inline: true, facesLeft: false, frames: {
-    idle: 1, run1: 1, run2: 1, jump: 1, fall: 1, dash: 1 } },
+  /* Madeline: the PICO-8 Celeste Classic sprites, from the same
+     officially released repo as Player.cs. 8×8 native, drawn at 2×
+     (crisp); the dash frame is the air pose with the classic's
+     spent-dash blue hair. */
+  celeste: { facesLeft: false, scale: 2, smooth: false, frames: {
+    idle: 'celeste_idle',
+    run1: 'celeste_run1', run2: 'celeste_run2',
+    run3: 'celeste_run3', run4: 'celeste_run4',
+    jump: 'celeste_air', fall: 'celeste_air',
+    dash: 'celeste_dash' } },
 };
 
 const SPRITE_CACHE = {};   // [charKey][frameKey] = {right, left, w, h}
-const ASSET_V = 14;        // bump when sprite files change, so caches can't
+const ASSET_V = 15;        // bump when sprite files change, so caches can't
                            // mix frame generations (e.g. old walk + new idle)
 
 /* Hand-drawn placeholder pixel art, used when assets/ is missing (the ripped
@@ -875,7 +881,8 @@ function loadSprites() {
             if (ORI_OS[grp]) k *= ORI_OS_REF / ORI_OS[grp];
           }
           const entry = { w: def.scale ? w * k : w, h: def.scale ? h * k : h,
-                          smooth: !!def.scale };    /* exact fractions → 1:1 */
+                          smooth: !!def.scale && def.smooth !== false };
+                                                    /* exact fractions → 1:1 */
           if (def.facesLeft) { entry.right = b; entry.left = a; }
           else { entry.right = a; entry.left = b; }
           SPRITE_CACHE[charKey][frameKey] = entry;
@@ -1825,7 +1832,7 @@ function spriteFrameKey() {
     }
     if (charKey === 'celeste') {
       if (player.dashing > 0) return 'dash';
-      return 'run' + (Math.floor(animClock / 5) % 2 + 1);
+      return 'run' + (Math.floor(animClock / 5) % 4 + 1);
     }
     if (charKey === 'megamanx') {
       if (speed > CHARS.megamanx.defaults.walkSpeed + 0.05)

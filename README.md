@@ -253,10 +253,13 @@ Values are px/frame at 60 Hz, from disassembly-based documentation:
   5.333, DashTime 0.15 s → 9 frames, DashCooldown 0.2 s → 12 frames,
   dash refilled on landing. *Simplified:* the dash here is horizontal
   only (the game's is 8-way), and wall mechanics, climbing, stamina,
-  super/hyper dashes, and fast-fall are out of scope. Madeline is
-  placeholder pixel art for now (her gameplay frames aren't on the
-  sprite sites; they can be decoded from an owned copy's Gameplay
-  atlas). Celeste is © Maddy Makes Games.
+  super/hyper dashes, and fast-fall are out of scope. Madeline's
+  sprites are the PICO-8 *Celeste Classic* frames from the same
+  officially released repo (`Source/PICO-8/Graphics/atlas.png`) — 8×8
+  native, drawn at 2× — with the dash frame using the classic's
+  spent-dash blue hair as its visual signal, since the classic marks
+  dash state by hair color rather than a separate sprite. Celeste is
+  © Maddy Makes Games.
 - **Castlevania** ([TASVideos frame data](https://tasvideos.org/GameResources/NES/Castlevania)):
   walk 1 px/frame; flat jump 40 frames; lands on ledges 2 blocks up at frame
   29, 1 up at 36, never 3 up. The original uses a preset trajectory table
